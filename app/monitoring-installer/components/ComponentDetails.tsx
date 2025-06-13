@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState } from 'react'
+import { useLanguage } from '@/contexts/language-context' // Added
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -546,7 +547,7 @@ export const COMPONENT_CONFIGS: Record<string, MonitoringComponent> = {
   }
 }
 
-const CategoryBadge = ({ category }: { category: string }) => {
+const CategoryBadge = ({ category, t }: { category: string; t: (key: string) => string }) => {
   const categoryColors: Record<string, string> = {
     collector: 'bg-blue-100 text-blue-800',
     storage: 'bg-green-100 text-green-800',
@@ -554,21 +555,25 @@ const CategoryBadge = ({ category }: { category: string }) => {
     alerting: 'bg-orange-100 text-orange-800'
   }
 
-  const categoryNames: Record<string, string> = {
-    collector: '数据采集',
-    storage: '数据存储',
-    visualization: '数据可视化',
-    alerting: '告警管理'
+  // Using t function for names now
+  const categoryKeyMap: Record<string, string> = {
+    collector: 'categories.collector',
+    storage: 'categories.storage',
+    visualization: 'categories.visualization',
+    alerting: 'categories.alerting'
   }
 
   return (
     <Badge className={categoryColors[category]}>
-      {categoryNames[category] || category}
+      {t(categoryKeyMap[category] || category)}
     </Badge>
   )
 }
 
-const ComponentSettings = ({ componentId }: { componentId: string }) => {
+// Forward declaration for t type, or import from LanguageContext if preferred
+type TFunction = (key: string, params?: Record<string, string | number>) => string;
+
+const ComponentSettings = ({ componentId, t }: { componentId: string; t: TFunction }) => {
   const [settings, setSettings] = useState<Record<string, any>>({})
 
   const handleSettingChange = (key: string, value: any) => {
@@ -581,7 +586,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
         <div className="flex items-center justify-between">
           <Label htmlFor="ne-enabled" className="flex items-center gap-2">
             <Server className="h-4 w-4" />
-            启用主机指标收集
+            {t('componentSettings.nodeExporter.enableHostMetrics.label')}
           </Label>
           <Switch 
             id="ne-enabled" 
@@ -590,7 +595,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="ne-port">监听端口</Label>
+          <Label htmlFor="ne-port">{t('componentSettings.nodeExporter.listenPort.label')}</Label>
           <Input 
             id="ne-port" 
             type="number" 
@@ -599,7 +604,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label>启用的收集器</Label>
+          <Label>{t('componentSettings.nodeExporter.enabledCollectors.label')}</Label>
           <div className="grid grid-cols-2 gap-2">
             {['cpu', 'diskstats', 'filesystem', 'loadavg', 'meminfo', 'netdev'].map(collector => (
               <div key={collector} className="flex items-center space-x-2">
@@ -628,7 +633,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="cat-interval">采集间隔 (秒)</Label>
+          <Label htmlFor="cat-interval">{t('componentSettings.categraf.interval.label')}</Label>
           <Input 
             id="cat-interval" 
             type="number" 
@@ -637,7 +642,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="cat-hostname">主机名</Label>
+          <Label htmlFor="cat-hostname">{t('componentSettings.categraf.hostname.label')}</Label>
           <Input 
             id="cat-hostname" 
             defaultValue="auto" 
@@ -645,7 +650,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label>启用的插件</Label>
+          <Label>{t('componentSettings.categraf.enabledPlugins.label')}</Label>
           <div className="grid grid-cols-2 gap-2">
             {['cpu', 'disk', 'diskio', 'mem', 'net', 'processes'].map(plugin => (
               <div key={plugin} className="flex items-center space-x-2">
@@ -674,7 +679,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="vm-retention">数据保留期 (天)</Label>
+          <Label htmlFor="vm-retention">{t('componentSettings.victoriametrics.retentionPeriod.label')}</Label>
           <Input 
             id="vm-retention" 
             type="number" 
@@ -683,7 +688,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vm-port">HTTP监听端口</Label>
+          <Label htmlFor="vm-port">{t('componentSettings.victoriametrics.httpListenPort.label')}</Label>
           <Input 
             id="vm-port" 
             type="number" 
@@ -692,7 +697,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vm-storage">存储路径</Label>
+          <Label htmlFor="vm-storage">{t('componentSettings.victoriametrics.storagePath.label')}</Label>
           <Input 
             id="vm-storage" 
             defaultValue="/var/lib/victoriametrics" 
@@ -702,7 +707,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
         <div className="flex items-center justify-between">
           <Label htmlFor="vm-dedup" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
-            启用数据去重
+            {t('componentSettings.victoriametrics.enableDeduplication.label')}
           </Label>
           <Switch 
             id="vm-dedup" 
@@ -713,7 +718,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
         <div className="flex items-center justify-between">
           <Label htmlFor="vm-remote-write" className="flex items-center gap-2">
             <Network className="h-4 w-4" />
-            启用远程写入
+            {t('componentSettings.victoriametrics.enableRemoteWrite.label')}
           </Label>
           <Switch 
             id="vm-remote-write" 
@@ -729,7 +734,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="vms-retention">数据保留期 (天)</Label>
+          <Label htmlFor="vms-retention">{t('componentSettings.vmstorage.retentionPeriod.label')}</Label>
           <Input 
             id="vms-retention" 
             type="number" 
@@ -738,7 +743,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vms-port">HTTP监听端口</Label>
+          <Label htmlFor="vms-port">{t('componentSettings.vmstorage.httpListenPort.label')}</Label>
           <Input 
             id="vms-port" 
             type="number" 
@@ -747,7 +752,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vms-storage">存储路径</Label>
+          <Label htmlFor="vms-storage">{t('componentSettings.vmstorage.storagePath.label')}</Label>
           <Input 
             id="vms-storage" 
             defaultValue="/var/lib/vmstorage" 
@@ -755,7 +760,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vms-replicas">存储节点副本数</Label>
+          <Label htmlFor="vms-replicas">{t('componentSettings.vmstorage.replicas.label')}</Label>
           <div className="flex items-center space-x-4">
             <Slider
               id="vms-replicas"
@@ -772,7 +777,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
         <div className="flex items-center justify-between">
           <Label htmlFor="vms-dedup" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
-            启用数据去重
+            {t('componentSettings.vmstorage.enableDeduplication.label')}
           </Label>
           <Switch 
             id="vms-dedup" 
@@ -783,7 +788,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
         <div className="flex items-center justify-between">
           <Label htmlFor="vms-autoscale" className="flex items-center gap-2">
             <Layers className="h-4 w-4" />
-            启用自动扩容
+            {t('componentSettings.vmstorage.enableAutoScale.label')}
           </Label>
           <Switch 
             id="vms-autoscale" 
@@ -799,7 +804,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="vmi-port">HTTP监听端口</Label>
+          <Label htmlFor="vmi-port">{t('componentSettings.vminsert.httpListenPort.label')}</Label>
           <Input 
             id="vmi-port" 
             type="number" 
@@ -808,16 +813,16 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vmi-storage-nodes">存储节点地址</Label>
+          <Label htmlFor="vmi-storage-nodes">{t('componentSettings.vminsert.storageNodes.label')}</Label>
           <Textarea 
             id="vmi-storage-nodes" 
             defaultValue="vmstorage-1:8400,vmstorage-2:8400,vmstorage-3:8400" 
             onChange={(e) => handleSettingChange('storageNodes', e.target.value)}
-            placeholder="存储节点地址，用逗号分隔"
+            placeholder={t('componentSettings.vminsert.storageNodes.placeholder')}
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vmi-replicas">插入节点副本数</Label>
+          <Label htmlFor="vmi-replicas">{t('componentSettings.vminsert.replicas.label')}</Label>
           <div className="flex items-center space-x-4">
             <Slider
               id="vmi-replicas"
@@ -834,7 +839,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
         <div className="flex items-center justify-between">
           <Label htmlFor="vmi-autoscale" className="flex items-center gap-2">
             <Layers className="h-4 w-4" />
-            启用自动扩容
+            {t('componentSettings.vminsert.enableAutoScale.label')}
           </Label>
           <Switch 
             id="vmi-autoscale" 
@@ -850,7 +855,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="vmsel-port">HTTP监听端口</Label>
+          <Label htmlFor="vmsel-port">{t('componentSettings.vmselect.httpListenPort.label')}</Label>
           <Input 
             id="vmsel-port" 
             type="number" 
@@ -859,16 +864,16 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vmsel-storage-nodes">存储节点地址</Label>
+          <Label htmlFor="vmsel-storage-nodes">{t('componentSettings.vmselect.storageNodes.label')}</Label>
           <Textarea 
             id="vmsel-storage-nodes" 
             defaultValue="vmstorage-1:8401,vmstorage-2:8401,vmstorage-3:8401" 
             onChange={(e) => handleSettingChange('storageNodes', e.target.value)}
-            placeholder="存储节点地址，用逗号分隔"
+            placeholder={t('componentSettings.vmselect.storageNodes.placeholder')}
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vmsel-replicas">查询节点副本数</Label>
+          <Label htmlFor="vmsel-replicas">{t('componentSettings.vmselect.replicas.label')}</Label>
           <div className="flex items-center space-x-4">
             <Slider
               id="vmsel-replicas"
@@ -883,7 +888,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vmsel-cache-size">查询缓存大小 (MB)</Label>
+          <Label htmlFor="vmsel-cache-size">{t('componentSettings.vmselect.cacheSizeMB.label')}</Label>
           <Input 
             id="vmsel-cache-size" 
             type="number" 
@@ -894,7 +899,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
         <div className="flex items-center justify-between">
           <Label htmlFor="vmsel-autoscale" className="flex items-center gap-2">
             <Layers className="h-4 w-4" />
-            启用自动扩容
+            {t('componentSettings.vmselect.enableAutoScale.label')}
           </Label>
           <Switch 
             id="vmsel-autoscale" 
@@ -910,7 +915,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="vma-port">HTTP监听端口</Label>
+          <Label htmlFor="vma-port">{t('componentSettings.vmalert.httpListenPort.label')}</Label>
           <Input 
             id="vma-port" 
             type="number" 
@@ -919,7 +924,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vma-datasource">数据源URL</Label>
+          <Label htmlFor="vma-datasource">{t('componentSettings.vmalert.datasourceUrl.label')}</Label>
           <Input 
             id="vma-datasource" 
             defaultValue="http://vmselect:8481/select/0/prometheus" 
@@ -927,7 +932,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vma-notifier">通知器URL</Label>
+          <Label htmlFor="vma-notifier">{t('componentSettings.vmalert.notifierUrl.label')}</Label>
           <Input 
             id="vma-notifier" 
             defaultValue="http://alertmanager:9093" 
@@ -935,7 +940,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vma-eval-interval">评估间隔 (秒)</Label>
+          <Label htmlFor="vma-eval-interval">{t('componentSettings.vmalert.evaluationInterval.label')}</Label>
           <Input 
             id="vma-eval-interval" 
             type="number" 
@@ -946,7 +951,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
         <div className="flex items-center justify-between">
           <Label htmlFor="vma-external-labels" className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
-            启用外部标签
+            {t('componentSettings.vmalert.enableExternalLabels.label')}
           </Label>
           <Switch 
             id="vma-external-labels" 
@@ -962,7 +967,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="vma-remote-url">远程存储URL</Label>
+          <Label htmlFor="vma-remote-url">{t('componentSettings.vmagent.remoteWriteUrl.label')}</Label>
           <Input 
             id="vma-remote-url" 
             defaultValue="http://localhost:8428/api/v1/write" 
@@ -970,7 +975,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vma-scrape-interval">抓取间隔 (秒)</Label>
+          <Label htmlFor="vma-scrape-interval">{t('componentSettings.vmagent.scrapeInterval.label')}</Label>
           <Input 
             id="vma-scrape-interval" 
             type="number" 
@@ -981,7 +986,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
         <div className="flex items-center justify-between">
           <Label htmlFor="vma-discovery" className="flex items-center gap-2">
             <Network className="h-4 w-4" />
-            启用服务发现
+            {t('componentSettings.vmagent.enableServiceDiscovery.label')}
           </Label>
           <Switch 
             id="vma-discovery" 
@@ -997,7 +1002,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="grafana-port">HTTP端口</Label>
+          <Label htmlFor="grafana-port">{t('componentSettings.grafana.httpPort.label')}</Label>
           <Input 
             id="grafana-port" 
             type="number" 
@@ -1006,7 +1011,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="grafana-admin">管理员用户名</Label>
+          <Label htmlFor="grafana-admin">{t('componentSettings.grafana.adminUser.label')}</Label>
           <Input 
             id="grafana-admin" 
             defaultValue="admin" 
@@ -1014,7 +1019,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="grafana-password">管理员密码</Label>
+          <Label htmlFor="grafana-password">{t('componentSettings.grafana.adminPassword.label')}</Label>
           <Input 
             id="grafana-password" 
             type="password" 
@@ -1023,7 +1028,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label>自动配置数据源</Label>
+          <Label>{t('componentSettings.grafana.autoConfigDataSource.label')}</Label>
           <div className="grid grid-cols-1 gap-2">
             <div className="flex items-center space-x-2">
               <Checkbox 
@@ -1031,7 +1036,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
                 defaultChecked 
                 onCheckedChange={(checked) => handleSettingChange('configureVMDataSource', checked)}
               />
-              <Label htmlFor="grafana-ds-vm" className="text-sm">VictoriaMetrics</Label>
+              <Label htmlFor="grafana-ds-vm" className="text-sm">{t('componentSettings.grafana.vmDataSource.label')}</Label>
             </div>
           </div>
         </div>
@@ -1043,7 +1048,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="am-port">HTTP端口</Label>
+          <Label htmlFor="am-port">{t('componentSettings.alertmanager.httpPort.label')}</Label>
           <Input 
             id="am-port" 
             type="number" 
@@ -1052,25 +1057,25 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="am-cluster">集群对等节点</Label>
+          <Label htmlFor="am-cluster">{t('componentSettings.alertmanager.clusterPeers.label')}</Label>
           <Textarea 
             id="am-cluster" 
-            placeholder="每行一个节点地址，例如: alertmanager-peer:9094" 
+            placeholder={t('componentSettings.alertmanager.clusterPeers.placeholder')}
             onChange={(e) => handleSettingChange('peers', e.target.value.split('\n'))}
           />
         </div>
         <div className="space-y-2">
-          <Label>通知渠道</Label>
+          <Label>{t('componentSettings.alertmanager.notificationChannel.label')}</Label>
           <Select defaultValue="email" onValueChange={(value) => handleSettingChange('notifier', value)}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="email">邮件</SelectItem>
-              <SelectItem value="webhook">Webhook</SelectItem>
-              <SelectItem value="slack">Slack</SelectItem>
-              <SelectItem value="wechat">微信</SelectItem>
-              <SelectItem value="dingtalk">钉钉</SelectItem>
+              <SelectItem value="email">{t('componentSettings.alertmanager.notifiers.email')}</SelectItem>
+              <SelectItem value="webhook">{t('componentSettings.alertmanager.notifiers.webhook')}</SelectItem>
+              <SelectItem value="slack">{t('componentSettings.alertmanager.notifiers.slack')}</SelectItem>
+              <SelectItem value="wechat">{t('componentSettings.alertmanager.notifiers.wechat')}</SelectItem>
+              <SelectItem value="dingtalk">{t('componentSettings.alertmanager.notifiers.dingtalk')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -1082,7 +1087,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="snmp-port">HTTP端口</Label>
+          <Label htmlFor="snmp-port">{t('componentSettings.snmpExporter.httpPort.label')}</Label>
           <Input 
             id="snmp-port" 
             type="number" 
@@ -1091,20 +1096,20 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="snmp-version">SNMP版本</Label>
+          <Label htmlFor="snmp-version">{t('componentSettings.snmpExporter.snmpVersion.label')}</Label>
           <Select defaultValue="v2c" onValueChange={(value) => handleSettingChange('snmpVersion', value)}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="v1">SNMP v1</SelectItem>
-              <SelectItem value="v2c">SNMP v2c</SelectItem>
-              <SelectItem value="v3">SNMP v3</SelectItem>
+              <SelectItem value="v1">{t('componentSettings.snmpExporter.versions.v1')}</SelectItem>
+              <SelectItem value="v2c">{t('componentSettings.snmpExporter.versions.v2c')}</SelectItem>
+              <SelectItem value="v3">{t('componentSettings.snmpExporter.versions.v3')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="snmp-community">Community字符串</Label>
+          <Label htmlFor="snmp-community">{t('componentSettings.snmpExporter.communityString.label')}</Label>
           <Input 
             id="snmp-community" 
             defaultValue="public" 
@@ -1112,10 +1117,10 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="snmp-targets">目标设备</Label>
+          <Label htmlFor="snmp-targets">{t('componentSettings.snmpExporter.targetDevices.label')}</Label>
           <Textarea 
             id="snmp-targets" 
-            placeholder="每行一个IP地址，例如: 192.168.1.1" 
+            placeholder={t('componentSettings.snmpExporter.targetDevices.placeholder')}
             onChange={(e) => handleSettingChange('targets', e.target.value.split('\n'))}
           />
         </div>
@@ -1127,7 +1132,7 @@ const ComponentSettings = ({ componentId }: { componentId: string }) => {
     <div className="p-4 border rounded-md bg-muted/50">
       <div className="flex items-center gap-2 text-muted-foreground">
         <Info className="h-4 w-4" />
-        <p>此组件没有可配置的设置</p>
+        <p>{t('componentSettings.noSettingsAvailable')}</p>
       </div>
     </div>
   )
@@ -1140,6 +1145,7 @@ interface ComponentDetailsProps {
 }
 
 export default function ComponentDetails({ componentId, onVersionChange, selectedVersion }: ComponentDetailsProps) {
+  const { t } = useLanguage() // Added
   const component = COMPONENT_CONFIGS[componentId]
   
   if (!component) {
@@ -1147,7 +1153,7 @@ export default function ComponentDetails({ componentId, onVersionChange, selecte
       <div className="p-4 border rounded-md">
         <div className="flex items-center gap-2 text-muted-foreground">
           <AlertCircle className="h-4 w-4" />
-          <p>未找到组件信息</p>
+          <p>{t('componentDetails.notFound')}</p>
         </div>
       </div>
     )
@@ -1158,31 +1164,31 @@ export default function ComponentDetails({ componentId, onVersionChange, selecte
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-xl">{component.name}</CardTitle>
+            <CardTitle className="text-xl">{component.name}</CardTitle> {/* Assuming component.name is a proper noun or translated in data */}
             <div className="flex items-center gap-2 mt-1">
-              <CategoryBadge category={component.category} />
+              <CategoryBadge category={component.category} t={t} />
               <Badge variant="outline" className="text-xs">
-                端口: {component.defaultPort}
+                {t('componentDetails.portLabel')} {component.defaultPort}
               </Badge>
             </div>
           </div>
         </div>
-        <CardDescription>{component.description}</CardDescription>
+        <CardDescription>{component.description}</CardDescription> {/* Assuming component.description is translated in data or proper noun */}
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">概览</TabsTrigger>
-            <TabsTrigger value="versions">版本</TabsTrigger>
-            <TabsTrigger value="config">配置</TabsTrigger>
-            <TabsTrigger value="docs">文档</TabsTrigger>
+            <TabsTrigger value="overview">{t('componentDetails.tabs.overview')}</TabsTrigger>
+            <TabsTrigger value="versions">{t('componentDetails.tabs.versions')}</TabsTrigger>
+            <TabsTrigger value="config">{t('componentDetails.tabs.config')}</TabsTrigger>
+            <TabsTrigger value="docs">{t('componentDetails.tabs.docs')}</TabsTrigger>
           </TabsList>
           
           <TabsContent value="overview" className="space-y-4">
             <div>
-              <h4 className="text-sm font-medium mb-2">主要功能</h4>
+              <h4 className="text-sm font-medium mb-2">{t('componentDetails.overview.mainFeatures')}</h4>
               <div className="grid grid-cols-2 gap-2">
-                {component.features.map((feature, index) => (
+                {component.features.map((feature, index) => ( // Features are from data - translate in data source if needed
                   <div key={index} className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-green-500" />
                     <span className="text-sm">{feature}</span>
@@ -1192,7 +1198,7 @@ export default function ComponentDetails({ componentId, onVersionChange, selecte
             </div>
             
             <div>
-              <h4 className="text-sm font-medium mb-2">默认端口</h4>
+              <h4 className="text-sm font-medium mb-2">{t('componentDetails.overview.defaultPort')}</h4>
               <div className="flex items-center gap-2">
                 <Network className="h-4 w-4 text-blue-500" />
                 <span className="text-sm">{component.defaultPort}</span>
@@ -1201,9 +1207,9 @@ export default function ComponentDetails({ componentId, onVersionChange, selecte
             
             {component.dependencies.length > 0 && (
               <div>
-                <h4 className="text-sm font-medium mb-2">依赖组件</h4>
+                <h4 className="text-sm font-medium mb-2">{t('componentDetails.overview.dependencies')}</h4>
                 <div className="flex flex-wrap gap-1">
-                  {component.dependencies.map(dep => {
+                  {component.dependencies.map(dep => { // dep names are from data
                     const depComponent = COMPONENT_CONFIGS[dep]
                     return (
                       <Badge key={dep} variant="outline" className="text-xs">
@@ -1216,19 +1222,19 @@ export default function ComponentDetails({ componentId, onVersionChange, selecte
             )}
             
             <div>
-              <h4 className="text-sm font-medium mb-2">系统需求</h4>
+              <h4 className="text-sm font-medium mb-2">{t('componentDetails.overview.systemRequirements')}</h4>
               <div className="grid grid-cols-3 gap-2">
                 <div className="flex items-center gap-2">
                   <Cpu className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm">CPU: {component.requirements.cpu}</span>
+                  <span className="text-sm">{t('componentDetails.overview.cpuLabel')} {component.requirements.cpu}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <HardDrive className="h-4 w-4 text-green-500" />
-                  <span className="text-sm">内存: {component.requirements.memory}</span>
+                  <span className="text-sm">{t('componentDetails.overview.memoryLabel')} {component.requirements.memory}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Database className="h-4 w-4 text-purple-500" />
-                  <span className="text-sm">磁盘: {component.requirements.disk}</span>
+                  <span className="text-sm">{t('componentDetails.overview.diskLabel')} {component.requirements.disk}</span>
                 </div>
               </div>
             </div>
@@ -1242,7 +1248,7 @@ export default function ComponentDetails({ componentId, onVersionChange, selecte
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <CardTitle className="text-base">{version.version}</CardTitle>
-                        {version.isLatest && <Badge>最新</Badge>}
+                        {version.isLatest && <Badge>{t('componentDetails.versions.latestBadge')}</Badge>}
                       </div>
                       <div className="flex items-center gap-2">
                         <Button 
@@ -1250,7 +1256,7 @@ export default function ComponentDetails({ componentId, onVersionChange, selecte
                           variant={version.version === selectedVersion ? "default" : "outline"}
                           onClick={() => onVersionChange(version.version)}
                         >
-                          {version.version === selectedVersion ? "已选择" : "选择"}
+                          {version.version === selectedVersion ? t('componentDetails.versions.selectedButton') : t('componentDetails.versions.selectButton')}
                         </Button>
                         <Button size="sm" variant="outline" asChild>
                           <a href={version.downloadUrl} target="_blank" rel="noopener noreferrer">
@@ -1261,14 +1267,14 @@ export default function ComponentDetails({ componentId, onVersionChange, selecte
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Clock className="h-4 w-4" />
-                      <span>发布日期: {version.releaseDate}</span>
+                      <span>{t('componentDetails.versions.releaseDateLabel')} {version.releaseDate}</span>
                     </div>
                   </CardHeader>
                   <CardContent className="py-2">
                     <div className="space-y-2">
-                      <h4 className="text-sm font-medium">更新日志:</h4>
+                      <h4 className="text-sm font-medium">{t('componentDetails.versions.changelogLabel')}</h4>
                       <div className="text-sm whitespace-pre-line">
-                        {version.changelog}
+                        {version.changelog} {/* Changelog is data */}
                       </div>
                     </div>
                   </CardContent>
@@ -1279,12 +1285,12 @@ export default function ComponentDetails({ componentId, onVersionChange, selecte
           
           <TabsContent value="config" className="space-y-4">
             {component.configurable ? (
-              <ComponentSettings componentId={component.id} />
+              <ComponentSettings componentId={component.id} t={t} />
             ) : (
               <div className="p-4 border rounded-md bg-muted/50">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Info className="h-4 w-4" />
-                  <p>此组件不需要额外配置，可以使用默认设置</p>
+                  <p>{t('componentDetails.config.defaultSettingsSufficient')}</p>
                 </div>
               </div>
             )}
@@ -1295,15 +1301,15 @@ export default function ComponentDetails({ componentId, onVersionChange, selecte
               <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-blue-500" />
-                  <span className="font-medium">官方文档</span>
+                  <span className="font-medium">{t('componentDetails.docs.officialDocsTitle')}</span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  访问 {component.name} 的官方文档以获取详细的安装和配置指南。
+                  {t('componentDetails.docs.visitOfficialDocsDescription', { componentName: component.name })}
                 </p>
                 <Button asChild>
                   <a href={component.documentation} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="h-4 w-4 mr-2" />
-                    访问文档
+                    {t('componentDetails.docs.accessDocsButton')}
                   </a>
                 </Button>
               </div>
