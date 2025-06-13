@@ -130,3 +130,5 @@ export function getTranslation(lang: string, key: string) {
 
   return value || key
 }
+
+export default translations

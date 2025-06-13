@@ -138,8 +138,7 @@ func (c *ConfigController) GenerateConfig(ctx *gin.Context) {
 
 func (c *ConfigController) ValidateConfig(ctx *gin.Context) {
 	var req struct {
-		Type    string `json:"type" binding:"required"`
-		Content string `json:"content" binding:"required"`
+		ID uint `json:"id" binding:"required"`
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -147,7 +146,7 @@ func (c *ConfigController) ValidateConfig(ctx *gin.Context) {
 		return
 	}
 
-	result, err := c.service.ValidateConfig(req.Type, req.Content)
+	result, err := c.service.ValidateConfig(req.ID)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

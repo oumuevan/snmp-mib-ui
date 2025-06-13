@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -68,7 +67,7 @@ func (c *AlertRulesController) GetAlertRules(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, utils.PaginatedResponse{
+	utils.SuccessResponse(ctx, "获取告警规则列表成功", utils.PaginatedResponse{
 		Items: rules,
 		Total: total,
 		Page:  page,
@@ -76,7 +75,7 @@ func (c *AlertRulesController) GetAlertRules(ctx *gin.Context) {
 	})
 }
 
-// GetAlertRule 获取单个告警规则
+// GetAlertRuleByID 获取单个告警规则
 // @Summary 获取单个告警规则
 // @Description 根据ID获取告警规则详情
 // @Tags alert-rules
@@ -85,7 +84,7 @@ func (c *AlertRulesController) GetAlertRules(ctx *gin.Context) {
 // @Param id path string true "规则ID"
 // @Success 200 {object} utils.Response{data=models.AlertRule}
 // @Router /api/alert-rules/{id} [get]
-func (c *AlertRulesController) GetAlertRule(ctx *gin.Context) {
+func (c *AlertRulesController) GetAlertRuleByID(ctx *gin.Context) {
 	id := ctx.Param("id")
 
 	rule, err := c.alertRulesService.GetAlertRuleByID(id)
@@ -94,8 +93,156 @@ func (c *AlertRulesController) GetAlertRule(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, rule)
+	utils.SuccessResponse(ctx, "获取告警规则成功", rule)
 }
+
+// BatchDeleteAlertRules 批量删除告警规则
+// @Summary 批量删除告警规则
+// @Description 批量删除告警规则
+// @Tags alert-rules
+// @Accept json
+// @Produce json
+// @Param request body models.BatchDeleteAlertRulesRequest true "批量删除请求"
+// @Success 200 {object} utils.Response{data=models.BatchDeleteAlertRulesResponse}
+// @Router /api/alert-rules/batch [delete]
+func (c *AlertRulesController) BatchDeleteAlertRules(ctx *gin.Context) {
+	var req models.BatchDeleteAlertRulesRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(ctx, http.StatusBadRequest, "请求参数错误", err)
+		return
+	}
+
+	result, err := c.alertRulesService.BatchDeleteAlertRules(&req)
+	if err != nil {
+		utils.ErrorResponse(ctx, http.StatusInternalServerError, "批量删除告警规则失败", err)
+		return
+	}
+
+	utils.SuccessResponse(ctx, "批量删除告警规则成功", result)
+}
+
+// QueryMetrics 查询指标数据
+// @Summary 查询指标数据
+// @Description 查询Prometheus指标数据
+// @Tags alert-rules
+// @Accept json
+// @Produce json
+// @Param request body models.QueryMetricsRequest true "查询请求"
+// @Success 200 {object} utils.Response{data=models.QueryMetricsResponse}
+// @Router /api/alert-rules/query [post]
+func (c *AlertRulesController) QueryMetrics(ctx *gin.Context) {
+	var req models.QueryMetricsRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(ctx, http.StatusBadRequest, "请求参数错误", err)
+		return
+	}
+
+	result, err := c.prometheusService.QueryMetrics(ctx.Request.Context(), req)
+	if err != nil {
+		utils.ErrorResponse(ctx, http.StatusInternalServerError, "查询指标数据失败", err)
+		return
+	}
+
+	utils.SuccessResponse(ctx, "查询指标数据成功", result)
+}
+
+// GetRuleTemplateByID 获取单个规则模板
+// @Summary 获取单个规则模板
+// @Description 根据ID获取规则模板详情
+// @Tags alert-rules
+// @Accept json
+// @Produce json
+// @Param id path string true "模板ID"
+// @Success 200 {object} utils.Response{data=models.AlertRuleTemplate}
+// @Router /api/alert-rule-templates/{id} [get]
+func (c *AlertRulesController) GetRuleTemplateByID(ctx *gin.Context) {
+	id := ctx.Param("id")
+
+	template, err := c.alertRulesService.GetRuleTemplateByID(id)
+	if err != nil {
+		utils.ErrorResponse(ctx, http.StatusNotFound, "规则模板不存在", err)
+		return
+	}
+
+	utils.SuccessResponse(ctx, "获取规则模板成功", template)
+}
+
+// UpdateRuleTemplate 更新规则模板
+// @Summary 更新规则模板
+// @Description 更新规则模板信息
+// @Tags alert-rules
+// @Accept json
+// @Produce json
+// @Param id path string true "模板ID"
+// @Param template body models.UpdateRuleTemplateRequest true "模板信息"
+// @Success 200 {object} utils.Response{data=models.AlertRuleTemplate}
+// @Router /api/alert-rule-templates/{id} [put]
+func (c *AlertRulesController) UpdateRuleTemplate(ctx *gin.Context) {
+	id := ctx.Param("id")
+	var req models.UpdateRuleTemplateRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(ctx, http.StatusBadRequest, "请求参数错误", err)
+		return
+	}
+
+	template, err := c.alertRulesService.UpdateRuleTemplate(id, &req)
+	if err != nil {
+		utils.ErrorResponse(ctx, http.StatusInternalServerError, "更新规则模板失败", err)
+		return
+	}
+
+	utils.SuccessResponse(ctx, "更新规则模板成功", template)
+}
+
+// DeleteRuleTemplate 删除规则模板
+// @Summary 删除规则模板
+// @Description 删除指定的规则模板
+// @Tags alert-rules
+// @Accept json
+// @Produce json
+// @Param id path string true "模板ID"
+// @Success 200 {object} utils.Response
+// @Router /api/alert-rule-templates/{id} [delete]
+func (c *AlertRulesController) DeleteRuleTemplate(ctx *gin.Context) {
+	id := ctx.Param("id")
+
+	err := c.alertRulesService.DeleteRuleTemplate(id)
+	if err != nil {
+		utils.ErrorResponse(ctx, http.StatusInternalServerError, "删除规则模板失败", err)
+		return
+	}
+
+	utils.SuccessResponse(ctx, "删除规则模板成功", nil)
+}
+
+// CloneRuleTemplate 克隆规则模板
+// @Summary 克隆规则模板
+// @Description 克隆现有的规则模板
+// @Tags alert-rules
+// @Accept json
+// @Produce json
+// @Param id path string true "模板ID"
+// @Param request body models.CloneRuleTemplateRequest true "克隆请求"
+// @Success 200 {object} utils.Response{data=models.AlertRuleTemplate}
+// @Router /api/alert-rule-templates/{id}/clone [post]
+func (c *AlertRulesController) CloneRuleTemplate(ctx *gin.Context) {
+	id := ctx.Param("id")
+	var req models.CloneRuleTemplateRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(ctx, http.StatusBadRequest, "请求参数错误", err)
+		return
+	}
+
+	template, err := c.alertRulesService.CloneRuleTemplate(id, &req)
+	if err != nil {
+		utils.ErrorResponse(ctx, http.StatusInternalServerError, "克隆规则模板失败", err)
+		return
+	}
+
+	utils.SuccessResponse(ctx, "克隆规则模板成功", template)
+}
+
+
 
 // CreateAlertRule 创建告警规则
 // @Summary 创建告警规则
@@ -114,7 +261,7 @@ func (c *AlertRulesController) CreateAlertRule(ctx *gin.Context) {
 	}
 
 	// 验证PromQL表达式
-	if err := c.prometheusService.ValidatePromQL(req.Expression); err != nil {
+	if err := c.prometheusService.ValidatePromQL(ctx.Request.Context(), req.Expression); err != nil {
 		utils.ErrorResponse(ctx, http.StatusBadRequest, "PromQL表达式无效", err)
 		return
 	}
@@ -125,7 +272,7 @@ func (c *AlertRulesController) CreateAlertRule(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, rule)
+	utils.SuccessResponse(ctx, "创建告警规则成功", rule)
 }
 
 // UpdateAlertRule 更新告警规则
@@ -148,7 +295,7 @@ func (c *AlertRulesController) UpdateAlertRule(ctx *gin.Context) {
 
 	// 验证PromQL表达式
 	if req.Expression != nil {
-		if err := c.prometheusService.ValidatePromQL(*req.Expression); err != nil {
+		if err := c.prometheusService.ValidatePromQL(ctx.Request.Context(), *req.Expression); err != nil {
 			utils.ErrorResponse(ctx, http.StatusBadRequest, "PromQL表达式无效", err)
 			return
 		}
@@ -160,7 +307,7 @@ func (c *AlertRulesController) UpdateAlertRule(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, rule)
+	utils.SuccessResponse(ctx, "获取告警规则成功", rule)
 }
 
 // DeleteAlertRule 删除告警规则
@@ -181,7 +328,7 @@ func (c *AlertRulesController) DeleteAlertRule(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, nil)
+	utils.SuccessResponse(ctx, "删除告警规则成功", nil)
 }
 
 // BatchCreateAlertRules 批量创建告警规则
@@ -206,7 +353,7 @@ func (c *AlertRulesController) BatchCreateAlertRules(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, result)
+	utils.SuccessResponse(ctx, "批量创建告警规则成功", result)
 }
 
 // BatchUpdateAlertRules 批量更新告警规则
@@ -231,7 +378,7 @@ func (c *AlertRulesController) BatchUpdateAlertRules(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, result)
+	utils.SuccessResponse(ctx, "批量更新告警规则成功", result)
 }
 
 // GetRuleTemplates 获取规则模板列表
@@ -262,7 +409,7 @@ func (c *AlertRulesController) GetRuleTemplates(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, templates)
+	utils.SuccessResponse(ctx, "获取规则模板列表成功", templates)
 }
 
 // CreateRuleTemplate 创建规则模板
@@ -287,7 +434,7 @@ func (c *AlertRulesController) CreateRuleTemplate(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, template)
+	utils.SuccessResponse(ctx, "创建规则模板成功", template)
 }
 
 // ApplyTemplate 应用模板到设备组
@@ -312,7 +459,7 @@ func (c *AlertRulesController) ApplyTemplate(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, result)
+	utils.SuccessResponse(ctx, "应用模板成功", result)
 }
 
 // GetDeviceGroups 获取设备分组列表
@@ -330,7 +477,7 @@ func (c *AlertRulesController) GetDeviceGroups(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, groups)
+	utils.SuccessResponse(ctx, "获取设备分组列表成功", groups)
 }
 
 // CreateDeviceGroup 创建设备分组
@@ -355,7 +502,7 @@ func (c *AlertRulesController) CreateDeviceGroup(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, group)
+	utils.SuccessResponse(ctx, "创建设备分组成功", group)
 }
 
 // UpdateDeviceGroup 更新设备分组
@@ -382,7 +529,7 @@ func (c *AlertRulesController) UpdateDeviceGroup(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, group)
+	utils.SuccessResponse(ctx, "更新设备分组成功", group)
 }
 
 // DeleteDeviceGroup 删除设备分组
@@ -403,7 +550,7 @@ func (c *AlertRulesController) DeleteDeviceGroup(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, nil)
+	utils.SuccessResponse(ctx, "删除设备分组成功", nil)
 }
 
 // AddDevicesToGroup 添加设备到分组
@@ -430,7 +577,7 @@ func (c *AlertRulesController) AddDevicesToGroup(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, nil)
+	utils.SuccessResponse(ctx, "添加设备到分组成功", nil)
 }
 
 // RemoveDevicesFromGroup 从分组移除设备
@@ -457,17 +604,88 @@ func (c *AlertRulesController) RemoveDevicesFromGroup(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, nil)
+	utils.SuccessResponse(ctx, "从分组移除设备成功", nil)
+}
+
+// GetDeviceGroupDevices 获取分组下的设备
+// @Summary 获取分组下的设备
+// @Description 获取指定分组下的所有设备
+// @Tags alert-rules
+// @Accept json
+// @Produce json
+// @Param id path string true "分组ID"
+// @Success 200 {object} utils.Response{data=[]models.Device}
+// @Router /api/alert-rules/device-groups/{id}/devices [get]
+func (c *AlertRulesController) GetDeviceGroupDevices(ctx *gin.Context) {
+	id := ctx.Param("id")
+
+	devices, err := c.deviceService.GetDeviceGroupDevices(id)
+	if err != nil {
+		utils.ErrorResponse(ctx, http.StatusInternalServerError, "获取分组设备失败", err)
+		return
+	}
+
+	utils.SuccessResponse(ctx, "获取分组设备成功", devices)
+}
+
+// BatchCreateDeviceGroups 批量创建设备分组
+// @Summary 批量创建设备分组
+// @Description 批量创建设备分组
+// @Tags alert-rules
+// @Accept json
+// @Produce json
+// @Param request body models.BatchCreateDeviceGroupsRequest true "批量创建请求"
+// @Success 200 {object} utils.Response{data=models.BatchCreateDeviceGroupsResponse}
+// @Router /api/alert-rules/device-groups/batch [post]
+func (c *AlertRulesController) BatchCreateDeviceGroups(ctx *gin.Context) {
+	var req models.BatchCreateDeviceGroupsRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(ctx, http.StatusBadRequest, "请求参数错误", err)
+		return
+	}
+
+	result, err := c.deviceService.BatchCreateDeviceGroups(req.Groups)
+	if err != nil {
+		utils.ErrorResponse(ctx, http.StatusInternalServerError, "批量创建设备分组失败", err)
+		return
+	}
+
+	utils.SuccessResponse(ctx, "批量创建设备分组成功", result)
+}
+
+// BatchDeleteDeviceGroups 批量删除设备分组
+// @Summary 批量删除设备分组
+// @Description 批量删除设备分组
+// @Tags alert-rules
+// @Accept json
+// @Produce json
+// @Param request body models.BatchDeleteDeviceGroupsRequest true "批量删除请求"
+// @Success 200 {object} utils.Response{data=models.BatchDeleteDeviceGroupsResponse}
+// @Router /api/alert-rules/device-groups/batch [delete]
+func (c *AlertRulesController) BatchDeleteDeviceGroups(ctx *gin.Context) {
+	var req models.BatchDeleteDeviceGroupsRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(ctx, http.StatusBadRequest, "请求参数错误", err)
+		return
+	}
+
+	err := c.deviceService.BatchDeleteDeviceGroups(req)
+	if err != nil {
+		utils.ErrorResponse(ctx, http.StatusInternalServerError, "批量删除设备分组失败", err)
+		return
+	}
+
+	utils.SuccessResponse(ctx, "批量删除设备分组成功", map[string]interface{}{"success": true})
 }
 
 // GetAlertmanagerConfig 获取Alertmanager配置
 // @Summary 获取Alertmanager配置
-// @Description 获取当前的Alertmanager配置
-// @Tags alert-rules
+// @Description 获取当前Alertmanager配置
+// @Tags alertmanager
 // @Accept json
 // @Produce json
 // @Success 200 {object} utils.Response{data=models.AlertmanagerConfig}
-// @Router /api/alert-rules/alertmanager/config [get]
+// @Router /api/alertmanager/config [get]
 func (c *AlertRulesController) GetAlertmanagerConfig(ctx *gin.Context) {
 	config, err := c.alertRulesService.GetAlertmanagerConfig()
 	if err != nil {
@@ -475,18 +693,18 @@ func (c *AlertRulesController) GetAlertmanagerConfig(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, config)
+	utils.SuccessResponse(ctx, "获取Alertmanager配置成功", config)
 }
 
 // UpdateAlertmanagerConfig 更新Alertmanager配置
 // @Summary 更新Alertmanager配置
 // @Description 更新Alertmanager配置
-// @Tags alert-rules
+// @Tags alertmanager
 // @Accept json
 // @Produce json
 // @Param config body models.UpdateAlertmanagerConfigRequest true "配置信息"
 // @Success 200 {object} utils.Response{data=models.AlertmanagerConfig}
-// @Router /api/alert-rules/alertmanager/config [put]
+// @Router /api/alertmanager/config [put]
 func (c *AlertRulesController) UpdateAlertmanagerConfig(ctx *gin.Context) {
 	var req models.UpdateAlertmanagerConfigRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -500,7 +718,7 @@ func (c *AlertRulesController) UpdateAlertmanagerConfig(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, config)
+	utils.SuccessResponse(ctx, "更新Alertmanager配置成功", config)
 }
 
 // SyncConfig 同步配置到Prometheus/Alertmanager
@@ -525,7 +743,7 @@ func (c *AlertRulesController) SyncConfig(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, result)
+	utils.SuccessResponse(ctx, "同步配置成功", result)
 }
 
 // GetSyncHistory 获取同步历史
@@ -548,7 +766,7 @@ func (c *AlertRulesController) GetSyncHistory(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, utils.PaginatedResponse{
+	utils.SuccessResponse(ctx, "获取同步历史成功", utils.PaginatedResponse{
 		Items: history,
 		Total: total,
 		Page:  page,
@@ -578,7 +796,7 @@ func (c *AlertRulesController) DiscoverDevices(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, result)
+	utils.SuccessResponse(ctx, "设备发现成功", result)
 }
 
 // GetRecommendations 获取智能推荐
@@ -606,7 +824,7 @@ func (c *AlertRulesController) GetRecommendations(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, recommendations)
+	utils.SuccessResponse(ctx, "获取推荐成功", recommendations)
 }
 
 // GenerateRecommendations 生成智能推荐
@@ -624,7 +842,7 @@ func (c *AlertRulesController) GenerateRecommendations(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, result)
+	utils.SuccessResponse(ctx, "生成推荐成功", result)
 }
 
 // ApplyRecommendation 应用推荐
@@ -645,7 +863,7 @@ func (c *AlertRulesController) ApplyRecommendation(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, nil)
+	utils.SuccessResponse(ctx, "应用推荐成功", nil)
 }
 
 // RejectRecommendation 拒绝推荐
@@ -672,7 +890,7 @@ func (c *AlertRulesController) RejectRecommendation(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, nil)
+	utils.SuccessResponse(ctx, "拒绝推荐成功", nil)
 }
 
 // ValidatePromQL 验证PromQL表达式
@@ -697,7 +915,7 @@ func (c *AlertRulesController) ValidatePromQL(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, result)
+	utils.SuccessResponse(ctx, "PromQL验证成功", result)
 }
 
 // GetMetrics 获取可用指标
@@ -712,13 +930,13 @@ func (c *AlertRulesController) ValidatePromQL(ctx *gin.Context) {
 func (c *AlertRulesController) GetMetrics(ctx *gin.Context) {
 	search := ctx.Query("search")
 
-	metrics, err := c.prometheusService.GetMetrics(search)
+	metrics, err := c.prometheusService.GetMetrics(ctx.Request.Context(), search)
 	if err != nil {
 		utils.ErrorResponse(ctx, http.StatusInternalServerError, "获取指标失败", err)
 		return
 	}
 
-	utils.SuccessResponse(ctx, metrics)
+	utils.SuccessResponse(ctx, "获取指标成功", metrics)
 }
 
 // ExportRules 导出告警规则
@@ -746,7 +964,7 @@ func (c *AlertRulesController) ExportRules(ctx *gin.Context) {
 	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 	ctx.Header("Content-Type", "application/octet-stream")
 
-	utils.SuccessResponse(ctx, exportData)
+	utils.SuccessResponse(ctx, "导出规则成功", exportData)
 }
 
 // ImportRules 导入告警规则
@@ -775,5 +993,5 @@ func (c *AlertRulesController) ImportRules(ctx *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(ctx, result)
+	utils.SuccessResponse(ctx, "导入规则成功", result)
 }

@@ -3,7 +3,37 @@ package models
 import (
 	"time"
 	"encoding/json"
+	"database/sql/driver"
+	"fmt"
 )
+
+// JSON 自定义JSON类型
+type JSON json.RawMessage
+
+// Value 实现driver.Valuer接口
+func (j JSON) Value() (driver.Value, error) {
+	if len(j) == 0 {
+		return nil, nil
+	}
+	return string(j), nil
+}
+
+// Scan 实现sql.Scanner接口
+func (j *JSON) Scan(value interface{}) error {
+	if value == nil {
+		*j = nil
+		return nil
+	}
+	switch s := value.(type) {
+	case string:
+		*j = JSON(s)
+	case []byte:
+		*j = JSON(s)
+	default:
+		return fmt.Errorf("cannot scan %T into JSON", value)
+	}
+	return nil
+}
 
 // AlertRule 告警规则模型
 type AlertRule struct {
@@ -234,6 +264,52 @@ type CreateRuleTemplateRequest struct {
 	Variables   map[string]interface{} `json:"variables" example:"{\"threshold\":{\"type\":\"number\",\"default\":80}}"`
 }
 
+// CloneRuleTemplateRequest 克隆规则模板请求
+type CloneRuleTemplateRequest struct {
+	Name        string `json:"name" binding:"required" example:"交换机CPU监控模板-副本"`
+	Description string `json:"description" example:"从现有模板克隆的副本"`
+}
+
+// UpdateRuleTemplateRequest 更新规则模板请求
+type UpdateRuleTemplateRequest struct {
+	Name        *string                `json:"name,omitempty" example:"交换机CPU监控模板"`
+	Description *string                `json:"description,omitempty" example:"适用于交换机CPU使用率监控的通用模板"`
+	Category    *string                `json:"category,omitempty" example:"system"`
+	Vendor      *string                `json:"vendor,omitempty" example:"cisco"`
+	DeviceType  *string                `json:"device_type,omitempty" example:"switch"`
+	Expression  *string                `json:"expression,omitempty" example:"cpu_usage{job=\"switch\"} > {{.threshold}}"`
+	Duration    *string                `json:"duration,omitempty" example:"5m"`
+	Severity    *string                `json:"severity,omitempty" example:"warning"`
+	Labels      map[string]string      `json:"labels,omitempty" example:"{\"team\":\"ops\"}"`
+	Annotations map[string]string      `json:"annotations,omitempty" example:"{\"summary\":\"CPU使用率过高\"}"`
+	Variables   map[string]interface{} `json:"variables,omitempty" example:"{\"threshold\":{\"type\":\"number\",\"default\":80}}"`
+}
+
+// BatchCreateDeviceGroupsRequest 批量创建设备分组请求
+type BatchCreateDeviceGroupsRequest struct {
+	Groups []CreateDeviceGroupRequest `json:"groups" binding:"required"`
+}
+
+// BatchCreateDeviceGroupsResponse 批量创建设备分组响应
+type BatchCreateDeviceGroupsResponse struct {
+	SuccessCount   int           `json:"success_count" example:"5"`
+	FailureCount   int           `json:"failure_count" example:"1"`
+	CreatedGroups  []DeviceGroup `json:"created_groups"`
+	Errors         []string      `json:"errors" example:"[\"设备分组名称重复: core-switches\"]"`
+}
+
+// BatchDeleteAlertRulesRequest 批量删除告警规则请求
+type BatchDeleteAlertRulesRequest struct {
+	RuleIDs []string `json:"rule_ids" binding:"required" example:"[\"rule-001\",\"rule-002\"]"`
+}
+
+// BatchDeleteAlertRulesResponse 批量删除告警规则响应
+type BatchDeleteAlertRulesResponse struct {
+	SuccessCount int      `json:"success_count" example:"5"`
+	FailureCount int      `json:"failure_count" example:"1"`
+	Errors       []string `json:"errors" example:"[\"规则不存在: rule-999\"]"`
+}
+
 // ApplyTemplateRequest 应用模板请求
 type ApplyTemplateRequest struct {
 	TemplateID     string                 `json:"template_id" binding:"required" example:"template-001"`
@@ -413,4 +489,20 @@ func (RuleRecommendation) TableName() string {
 
 func (DiscoveredDevice) TableName() string {
 	return "discovered_devices"
+}
+
+// QueryMetricsRequest Prometheus查询指标请求
+type QueryMetricsRequest struct {
+	Query      string                 `json:"query" binding:"required" example:"cpu_usage"`
+	Start      string                 `json:"start,omitempty" example:"2024-01-01T00:00:00Z"`
+	End        string                 `json:"end,omitempty" example:"2024-01-01T01:00:00Z"`
+	Step       string                 `json:"step,omitempty" example:"5m"`
+	Timeout    string                 `json:"timeout,omitempty" example:"30s"`
+	Params     map[string]interface{} `json:"params,omitempty"`
+}
+
+// BatchDeleteDeviceGroupsRequest 批量删除设备分组请求
+type BatchDeleteDeviceGroupsRequest struct {
+	GroupIDs []string `json:"group_ids" binding:"required" example:"[\"group-001\",\"group-002\"]"`
+	Force    bool     `json:"force,omitempty" example:"false"`
 }

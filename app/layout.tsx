@@ -11,10 +11,8 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { MobileNav } from "@/components/mobile-nav"
 
-// Dynamic import for performance monitoring
-const PerformanceMonitor = dynamic(() => import("@/components/performance-monitor"), {
-  ssr: false,
-})
+// Dynamic import for performance monitoring (client component)
+const PerformanceMonitor = dynamic(() => import("@/components/performance-monitor"))
 
 const inter = Inter({ subsets: ["latin"] })
 

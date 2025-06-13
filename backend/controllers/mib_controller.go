@@ -183,13 +183,7 @@ func (c *MIBController) UploadMIB(ctx *gin.Context) {
 }
 
 func (c *MIBController) ParseMIB(ctx *gin.Context) {
-	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid MIB ID"})
-		return
-	}
-
-	result, err := c.service.ParseMIB(uint(id))
+	result, err := c.service.ParseMIB(ctx.Param("id"))
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -199,14 +193,30 @@ func (c *MIBController) ParseMIB(ctx *gin.Context) {
 }
 
 func (c *MIBController) ValidateMIB(ctx *gin.Context) {
-	file, _, err := ctx.Request.FormFile("file")
+	file, header, err := ctx.Request.FormFile("file")
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "No file uploaded"})
 		return
 	}
 	defer file.Close()
 
-	result, err := c.service.ValidateMIBFile(file)
+	// 保存临时文件
+	tempPath := "/tmp/" + header.Filename
+	out, err := os.Create(tempPath)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create temp file"})
+		return
+	}
+	defer out.Close()
+	defer os.Remove(tempPath)
+
+	_, err = io.Copy(out, file)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
+		return
+	}
+
+	result, err := c.service.ValidateMIBFile(tempPath)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -979,3 +979,6 @@ export default function AlertRulesPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}

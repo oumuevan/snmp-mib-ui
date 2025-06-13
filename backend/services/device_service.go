@@ -1,6 +1,8 @@
 package services
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -153,4 +155,83 @@ func (s *DeviceService) GetDeviceTemplates(deviceType string) ([]models.DeviceTe
 
 func (s *DeviceService) CreateDeviceTemplate(template *models.DeviceTemplate) error {
 	return s.db.Create(template).Error
+}
+
+// GetDeviceGroupDevices 获取设备分组中的设备
+func (s *DeviceService) GetDeviceGroupDevices(groupID string) ([]models.Device, error) {
+	var group models.DeviceGroup
+	if err := s.db.Preload("Devices").First(&group, "id = ?", groupID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("设备分组不存在")
+		}
+		return nil, fmt.Errorf("获取设备分组失败: %w", err)
+	}
+
+	return group.Devices, nil
+}
+
+// BatchCreateDeviceGroups 批量创建设备分组
+func (s *DeviceService) BatchCreateDeviceGroups(groups []models.CreateDeviceGroupRequest) (*models.BatchCreateDeviceGroupsResponse, error) {
+	response := &models.BatchCreateDeviceGroupsResponse{
+		CreatedGroups: []models.DeviceGroup{},
+		Errors:        []string{},
+	}
+
+	for _, groupReq := range groups {
+		// 转换标签和选择器为JSON
+		tagsJson, _ := json.Marshal(groupReq.Tags)
+		selectorJson, _ := json.Marshal(groupReq.Selector)
+
+		group := models.DeviceGroup{
+			ID:          fmt.Sprintf("group-%d", time.Now().UnixNano()),
+			Name:        groupReq.Name,
+			Description: groupReq.Description,
+			Tags:        models.JSON(tagsJson),
+			Selector:    models.JSON(selectorJson),
+			CreatedBy:   "system",
+			UpdatedBy:   "system",
+		}
+
+		if err := s.db.Create(&group).Error; err != nil {
+			response.FailureCount++
+			response.Errors = append(response.Errors, fmt.Sprintf("创建设备分组失败 %s: %v", groupReq.Name, err))
+		} else {
+			response.SuccessCount++
+			response.CreatedGroups = append(response.CreatedGroups, group)
+		}
+	}
+
+	return response, nil
+}
+
+// BatchDeleteDeviceGroups 批量删除设备分组
+func (s *DeviceService) BatchDeleteDeviceGroups(req models.BatchDeleteDeviceGroupsRequest) error {
+	for _, groupID := range req.GroupIDs {
+		// 检查分组是否存在
+		var group models.DeviceGroup
+		if err := s.db.First(&group, "id = ?", groupID).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				continue // 忽略不存在的分组
+			}
+			return fmt.Errorf("检查设备分组失败: %w", err)
+		}
+
+		// 如果不是强制删除，检查是否有关联的告警规则
+		if !req.Force {
+			var ruleCount int64
+			if err := s.db.Model(&models.AlertRule{}).Where("device_group_id = ?", groupID).Count(&ruleCount).Error; err != nil {
+				return fmt.Errorf("检查关联规则失败: %w", err)
+			}
+			if ruleCount > 0 {
+				return fmt.Errorf("设备分组 %s 有关联的告警规则，无法删除", groupID)
+			}
+		}
+
+		// 删除分组
+		if err := s.db.Delete(&group).Error; err != nil {
+			return fmt.Errorf("删除设备分组失败: %w", err)
+		}
+	}
+
+	return nil
 }

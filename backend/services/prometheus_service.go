@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"mib-platform/utils"
+	"mib-platform/models"
 )
 
 // PrometheusService Prometheus/VictoriaMetrics服务
@@ -132,32 +133,7 @@ func (s *PrometheusService) QueryRange(ctx context.Context, query string, start,
 	return &result, nil
 }
 
-// GetMetrics 获取所有可用指标
-func (s *PrometheusService) GetMetrics(ctx context.Context) ([]string, error) {
-	url := fmt.Sprintf("%s/api/v1/label/__name__/values", s.baseURL)
-	resp, err := s.doRequest(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("获取指标列表失败: %w", err)
-	}
-	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %w", err)
-	}
-
-	var result LabelValues
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("解析响应失败: %w", err)
-	}
-
-	if result.Status != "success" {
-		return nil, fmt.Errorf("获取指标列表错误")
-	}
-
-	s.logger.Debug("获取指标列表成功", "count", len(result.Data))
-	return result.Data, nil
-}
 
 // GetMetricMetadata 获取指标元数据
 func (s *PrometheusService) GetMetricMetadata(ctx context.Context, metric string) (*MetricMetadata, error) {
@@ -344,7 +320,7 @@ func (s *PrometheusService) GetCommonMetrics(ctx context.Context) (map[string][]
 	}
 
 	// 验证指标是否存在
-	availableMetrics, err := s.GetMetrics(ctx)
+	availableMetrics, err := s.GetMetrics(ctx, "")
 	if err != nil {
 		return commonMetrics, nil // 返回默认列表
 	}
@@ -447,6 +423,138 @@ func (s *PrometheusService) CheckConnectivity(ctx context.Context) error {
 
 	s.logger.Info("Prometheus连通性检查成功")
 	return nil
+}
+
+// ValidatePromQL 验证PromQL表达式
+func (s *PrometheusService) ValidatePromQL(ctx context.Context, query string) error {
+	params := url.Values{}
+	params.Set("query", query)
+
+	url := fmt.Sprintf("%s/api/v1/query?%s", s.baseURL, params.Encode())
+	resp, err := s.doRequest(ctx, "GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("验证PromQL失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("读取响应失败: %w", err)
+	}
+
+	var result QueryResult
+	if err := json.Unmarshal(body, &result); err != nil {
+		return fmt.Errorf("解析响应失败: %w", err)
+	}
+
+	if result.Status != "success" {
+		return fmt.Errorf("PromQL语法错误: %s", result.Error)
+	}
+
+	s.logger.Debug("PromQL验证成功", "query", query)
+	return nil
+}
+
+// ValidateAndTestPromQL 验证并测试PromQL表达式
+func (s *PrometheusService) ValidateAndTestPromQL(expression string) (interface{}, error) {
+	ctx := context.Background()
+	err := s.ValidatePromQL(ctx, expression)
+	if err != nil {
+		return nil, err
+	}
+	
+	// 返回验证结果
+	return map[string]interface{}{
+		"valid": true,
+		"expression": expression,
+		"message": "PromQL表达式验证成功",
+	}, nil
+}
+
+// GetMetrics 获取可用指标列表
+func (s *PrometheusService) GetMetrics(ctx context.Context, search string) ([]string, error) {
+	url := fmt.Sprintf("%s/api/v1/label/__name__/values", s.baseURL)
+	
+	resp, err := s.doRequest(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("获取指标列表失败: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	var result struct {
+		Status string   `json:"status"`
+		Data   []string `json:"data"`
+		Error  string   `json:"error"`
+	}
+	
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("解析响应失败: %w", err)
+	}
+	
+	if result.Status != "success" {
+		return nil, fmt.Errorf("获取指标失败: %s", result.Error)
+	}
+	
+	// 如果有搜索条件，过滤指标
+	if search != "" {
+		var filtered []string
+		for _, metric := range result.Data {
+			if strings.Contains(strings.ToLower(metric), strings.ToLower(search)) {
+				filtered = append(filtered, metric)
+			}
+		}
+		return filtered, nil
+	}
+	
+	return result.Data, nil
+}
+
+// QueryMetrics 查询指标数据
+func (s *PrometheusService) QueryMetrics(ctx context.Context, req models.QueryMetricsRequest) (*QueryResult, error) {
+	params := url.Values{}
+	params.Set("query", req.Query)
+	
+	if req.Start != "" {
+		params.Set("start", req.Start)
+	}
+	if req.End != "" {
+		params.Set("end", req.End)
+	}
+	if req.Step != "" {
+		params.Set("step", req.Step)
+	}
+	
+	// 添加其他参数
+	for key, value := range req.Params {
+		if str, ok := value.(string); ok {
+			params.Set(key, str)
+		}
+	}
+	
+	var endpoint string
+	if req.Start != "" && req.End != "" {
+		endpoint = "/api/v1/query_range"
+	} else {
+		endpoint = "/api/v1/query"
+	}
+	
+	url := fmt.Sprintf("%s%s?%s", s.baseURL, endpoint, params.Encode())
+	resp, err := s.doRequest(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("查询指标失败: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	var result QueryResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("解析响应失败: %w", err)
+	}
+	
+	if result.Status != "success" {
+		return nil, fmt.Errorf("查询失败: %s", result.Error)
+	}
+	
+	return &result, nil
 }
 
 // doRequest 执行HTTP请求

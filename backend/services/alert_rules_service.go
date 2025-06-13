@@ -1,9 +1,9 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"mime/multipart"
 	"strings"
 	"time"
@@ -12,7 +12,6 @@ import (
 	"mib-platform/models"
 	"mib-platform/utils"
 	"gorm.io/gorm"
-	"gopkg.in/yaml.v2"
 )
 
 // AlertRulesService 告警规则服务
@@ -823,3 +822,199 @@ func (s *AlertRulesService) syncAlertmanagerConfig(force bool) (string, error) {
 	// TODO: 实现Alertmanager配置同步
 	return "alertmanager-hash", nil
 }
+
+// CloneRuleTemplate 克隆规则模板
+func (s *AlertRulesService) CloneRuleTemplate(id string, req *models.CloneRuleTemplateRequest) (*models.AlertRuleTemplate, error) {
+	// 获取原模板
+	original, err := s.GetRuleTemplateByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	// 创建新模板
+	cloned := &models.AlertRuleTemplate{
+		ID:          uuid.New().String(),
+		Name:        req.Name,
+		Description: req.Description,
+		Category:    original.Category,
+		Vendor:      original.Vendor,
+		DeviceType:  original.DeviceType,
+		Expression:  original.Expression,
+		Duration:    original.Duration,
+		Severity:    original.Severity,
+		Labels:      original.Labels,
+		Annotations: original.Annotations,
+		Variables:   original.Variables,
+		IsBuiltin:   false,
+		UsageCount:  0,
+		CreatedBy:   "admin", // TODO: 从上下文获取用户信息
+		UpdatedBy:   "admin",
+	}
+
+	if err := s.db.Create(cloned).Error; err != nil {
+		return nil, fmt.Errorf("克隆规则模板失败: %w", err)
+	}
+
+	return cloned, nil
+}
+
+// UpdateRuleTemplate 更新规则模板
+func (s *AlertRulesService) UpdateRuleTemplate(id string, req *models.UpdateRuleTemplateRequest) (*models.AlertRuleTemplate, error) {
+	var template models.AlertRuleTemplate
+	if err := s.db.First(&template, "id = ?", id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("规则模板不存在")
+		}
+		return nil, fmt.Errorf("获取规则模板失败: %w", err)
+	}
+
+	// 更新字段
+	if req.Name != nil {
+		template.Name = *req.Name
+	}
+	if req.Description != nil {
+		template.Description = *req.Description
+	}
+	if req.Category != nil {
+		template.Category = *req.Category
+	}
+	if req.Vendor != nil {
+		template.Vendor = *req.Vendor
+	}
+	if req.DeviceType != nil {
+		template.DeviceType = *req.DeviceType
+	}
+	if req.Expression != nil {
+		template.Expression = *req.Expression
+	}
+	if req.Duration != nil {
+		template.Duration = *req.Duration
+	}
+	if req.Severity != nil {
+		template.Severity = *req.Severity
+	}
+	if req.Labels != nil {
+		labelsJSON, _ := json.Marshal(req.Labels)
+		template.Labels = models.JSON(labelsJSON)
+	}
+	if req.Annotations != nil {
+		annotationsJSON, _ := json.Marshal(req.Annotations)
+		template.Annotations = models.JSON(annotationsJSON)
+	}
+	if req.Variables != nil {
+		variablesJSON, _ := json.Marshal(req.Variables)
+		template.Variables = models.JSON(variablesJSON)
+	}
+
+	template.UpdatedBy = "admin" // TODO: 从上下文获取用户信息
+
+	if err := s.db.Save(&template).Error; err != nil {
+		return nil, fmt.Errorf("更新规则模板失败: %w", err)
+	}
+
+	return &template, nil
+}
+
+// DeleteRuleTemplate 删除规则模板
+func (s *AlertRulesService) DeleteRuleTemplate(id string) error {
+	var template models.AlertRuleTemplate
+	if err := s.db.First(&template, "id = ?", id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return fmt.Errorf("规则模板不存在")
+		}
+		return fmt.Errorf("获取规则模板失败: %w", err)
+	}
+
+	// 检查是否为内置模板
+	if template.IsBuiltin {
+		return fmt.Errorf("不能删除内置模板")
+	}
+
+	if err := s.db.Delete(&template).Error; err != nil {
+		return fmt.Errorf("删除规则模板失败: %w", err)
+	}
+
+	return nil
+}
+
+// BatchDeleteAlertRules 批量删除告警规则
+func (s *AlertRulesService) BatchDeleteAlertRules(req *models.BatchDeleteAlertRulesRequest) (*models.BatchDeleteAlertRulesResponse, error) {
+	response := &models.BatchDeleteAlertRulesResponse{
+		SuccessCount: 0,
+		FailureCount: 0,
+		Errors:       []string{},
+	}
+
+	for _, ruleID := range req.RuleIDs {
+		if err := s.DeleteAlertRule(ruleID); err != nil {
+			response.FailureCount++
+			response.Errors = append(response.Errors, fmt.Sprintf("删除规则 %s 失败: %s", ruleID, err.Error()))
+		} else {
+			response.SuccessCount++
+		}
+	}
+
+	return response, nil
+}
+
+// GetDeviceGroupDevices 获取设备分组中的设备
+func (s *AlertRulesService) GetDeviceGroupDevices(groupID string) ([]models.Device, error) {
+	var group models.DeviceGroup
+	if err := s.db.Preload("Devices").First(&group, "id = ?", groupID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("设备分组不存在")
+		}
+		return nil, fmt.Errorf("获取设备分组失败: %w", err)
+	}
+
+	return group.Devices, nil
+}
+
+// BatchCreateDeviceGroups 批量创建设备分组
+func (s *AlertRulesService) BatchCreateDeviceGroups(req *models.BatchCreateDeviceGroupsRequest) (*models.BatchCreateDeviceGroupsResponse, error) {
+	response := &models.BatchCreateDeviceGroupsResponse{
+		SuccessCount:  0,
+		FailureCount:  0,
+		CreatedGroups: []models.DeviceGroup{},
+		Errors:        []string{},
+	}
+
+	for _, groupReq := range req.Groups {
+		group, err := s.CreateDeviceGroup(&groupReq)
+		if err != nil {
+			response.FailureCount++
+			response.Errors = append(response.Errors, fmt.Sprintf("创建设备分组 %s 失败: %s", groupReq.Name, err.Error()))
+		} else {
+			response.SuccessCount++
+			response.CreatedGroups = append(response.CreatedGroups, *group)
+		}
+	}
+
+	return response, nil
+}
+
+// QueryMetrics 查询指标
+func (s *AlertRulesService) QueryMetrics(query string, timeRange string) (interface{}, error) {
+	// 解析时间范围
+	var duration time.Duration
+	var err error
+	if timeRange == "" {
+		duration = time.Hour // 默认1小时
+	} else {
+		duration, err = time.ParseDuration(timeRange)
+		if err != nil {
+			return nil, fmt.Errorf("无效的时间范围: %w", err)
+		}
+	}
+
+	// 计算时间范围
+	end := time.Now()
+	start := end.Add(-duration)
+	step := duration / 100 // 分成100个点
+
+	// 调用Prometheus服务查询指标
+	ctx := context.Background()
+	return s.prometheusService.QueryRange(ctx, query, start, end, step)
+}
+
+// ... existing code ...

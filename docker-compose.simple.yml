@@ -30,7 +30,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile.simple
+      dockerfile: Dockerfile
     container_name: mibweb-app
     ports:
       - "3000:3000"

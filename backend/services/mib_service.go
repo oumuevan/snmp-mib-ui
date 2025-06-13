@@ -3,14 +3,12 @@ package services
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"mime/multipart"
 	"os"
 	"strings"
 
 	"github.com/go-redis/redis/v8"
 	"gorm.io/gorm"
-
 	"mib-platform/models"
 )
 
@@ -171,7 +169,7 @@ func (s *MIBService) parseOIDDefinition(lines []string, startIndex int) (*models
 			// Extract OID value
 			oidValue := s.extractOIDValue(line)
 			if oidValue != "" {
-				oid.OID = oidValue
+				oid.OIDString = oidValue
 			}
 			break
 		}

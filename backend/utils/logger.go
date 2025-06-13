@@ -1,11 +1,21 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"time"
 )
+
+// PaginatedResponse 分页响应结构体
+type PaginatedResponse struct {
+	Items interface{} `json:"items"`
+	Total int64       `json:"total"`
+	Page  int         `json:"page"`
+	Limit int         `json:"limit"`
+}
 
 // Logger 日志接口
 type Logger interface {
@@ -182,4 +192,50 @@ func (l *StructuredLogger) log(level LogLevel, msg string, fields ...interface{}
 	}
 	
 	l.logger.Println(logMsg)
+}
+
+// Response 通用响应结构
+type Response struct {
+	Success bool        `json:"success"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
+	Error   string      `json:"error,omitempty"`
+}
+
+// SuccessResponse 返回成功响应
+func SuccessResponse(c interface{}, message string, data interface{}) {
+	response := Response{
+		Success: true,
+		Message: message,
+		Data:    data,
+	}
+	
+	// 检查是否为gin.Context类型
+	if ginCtx, ok := c.(interface{ JSON(int, interface{}) }); ok {
+		ginCtx.JSON(http.StatusOK, response)
+	} else if w, ok := c.(http.ResponseWriter); ok {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+// ErrorResponse 返回错误响应
+func ErrorResponse(c interface{}, statusCode int, message string, err error) {
+	response := Response{
+		Success: false,
+		Message: message,
+	}
+	if err != nil {
+		response.Error = err.Error()
+	}
+	
+	// 检查是否为gin.Context类型
+	if ginCtx, ok := c.(interface{ JSON(int, interface{}) }); ok {
+		ginCtx.JSON(statusCode, response)
+	} else if w, ok := c.(http.ResponseWriter); ok {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		json.NewEncoder(w).Encode(response)
+	}
 }
