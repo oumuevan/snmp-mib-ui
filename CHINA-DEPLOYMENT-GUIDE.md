@@ -78,7 +78,8 @@ EOF
 sudo tee /etc/resolv.conf << EOF
 nameserver 223.5.5.5
 nameserver 114.114.114.114
-nameserver 8.8.8.8
+nameserver 1.1.1.1 # Cloudflare DNS, generally good
+# <!-- Consider local ISP or trusted public DNS for your region -->
 EOF
 ```
 
@@ -490,6 +491,7 @@ echo "🔐 请确保已在 .env 文件中配置了安全的密码"
 
 ### 创建启动脚本
 
+<!-- TODO: This script should be created as a separate file (e.g., in scripts/ or root) and referenced here. -->
 **文件名**: `start-china.sh`
 
 ```bash

@@ -57,8 +57,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/your-org/mibweb-ui.git
-cd mibweb-ui
+git clone https://github.com/your-organization/your-repository-name.git
+cd mibweb-ui # Or your-repository-name if that's the cloned folder name
 
 # 安装依赖
 npm install
@@ -70,7 +70,8 @@ yarn install
 
 ```bash
 # 复制环境变量模板
-cp .env.development.example .env.local
+# cp .env.development.example .env.local # .env.development.example does not exist
+cp .env.example .env.local # Copy .env.example to .env.local and modify it for your development setup.
 
 # 编辑环境变量
 vim .env.local
@@ -84,7 +85,7 @@ NODE_ENV=development
 NEXT_PUBLIC_APP_NAME="MIB Web UI (Dev)"
 NEXT_PUBLIC_APP_VERSION="1.0.0-dev"
 
-# 数据库
+# 数据库 (for local development, differs from production)
 DATABASE_URL="postgresql://mibweb:password@localhost:5432/mibweb_dev"
 
 # Redis
@@ -96,7 +97,7 @@ NEXTAUTH_SECRET="dev-nextauth-secret"
 NEXTAUTH_URL="http://localhost:3000"
 
 # API
-API_BASE_URL="http://localhost:3000/api"
+API_BASE_URL="http://localhost:3000/api" # <!-- TODO: Clarify if API_BASE_URL for dev refers to Next.js API routes (port 3000) or a separate backend (e.g., Go backend on port 8080). -->
 
 # 调试
 DEBUG=true
@@ -115,7 +116,7 @@ docker-compose up -d postgres redis
 sleep 10
 
 # 运行数据库迁移
-npm run db:migrate
+npx prisma migrate dev
 
 # 启动开发服务器
 npm run dev
@@ -131,7 +132,7 @@ sudo systemctl start postgresql redis-server
 createdb mibweb_dev
 
 # 运行迁移
-npm run db:migrate
+npx prisma migrate dev
 
 # 启动开发服务器
 npm run dev
@@ -998,7 +999,7 @@ module.exports = withBundleAnalyzer({
 如果您在开发过程中遇到问题：
 
 1. 查看本文档的相关部分
-2. 搜索 [GitHub Issues](https://github.com/your-org/mibweb-ui/issues)
+2. 搜索 [GitHub Issues](https://github.com/your-organization/your-repository-name/issues) <!-- Adjusted placeholder -->
 3. 在团队 Slack 频道提问
 4. 联系项目维护者
 

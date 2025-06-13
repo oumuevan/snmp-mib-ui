@@ -115,10 +115,11 @@ docker-compose ps
 # 2. 访问 Web 界面
 # 浏览器打开: http://your-server-ip:3000
 # 默认账号: admin
-# 默认密码: admin123
+# 默认密码: admin123 <!-- 重要: 首次登录后请立即修改密码 -->
 
 # 3. 检查 API 接口
-curl -f http://localhost:3000/api/health
+curl -f http://localhost:8080/health # Backend health
+curl -f http://localhost:3000/api/health # Frontend health (if available)
 ```
 
 ---
@@ -132,7 +133,7 @@ curl -f http://localhost:3000/api/health
 ```bash
 # 克隆项目
 git clone <repository-url>
-cd web-ui
+cd mib-web-ui
 
 # 启动服务
 docker-compose up -d
@@ -150,7 +151,7 @@ docker-compose up -d
 
 ```bash
 # 使用 CentOS 专用脚本
-wget -O deploy-centos.sh https://raw.githubusercontent.com/your-repo/mibweb-ui/main/deploy-centos.sh
+wget -O deploy-centos.sh https://raw.githubusercontent.com/your-repo/mibweb-ui/main/deploy-centos.sh <!-- TODO: Verify URL and consider adding this script to the repository -->
 chmod +x deploy-centos.sh
 sudo ./deploy-centos.sh
 ```
@@ -184,14 +185,14 @@ git clone <your-repository-url> mibweb-ui
 cd mibweb-ui
 
 # 2. 配置生产环境变量
-cp .env.production .env
+cp .env.production .env # Ensure .env.production is available or use .env.example
 vim .env  # 编辑配置
 
-# 3. 启动生产环境
-docker-compose -f docker-compose.prod.yml up -d
+# 3. 启动生产环境 (Assuming docker-compose.yml is the primary production file)
+docker-compose -f docker-compose.yml up -d
 
 # 4. 查看日志
-docker-compose -f docker-compose.prod.yml logs -f
+docker-compose -f docker-compose.yml logs -f
 ```
 
 #### 开发环境部署
@@ -332,8 +333,8 @@ vim .env.local
 # 2. 启动数据库（Docker）
 docker-compose -f docker-compose.dev.yml up -d postgres redis
 
-# 3. 运行数据库迁移
-npm run db:migrate
+# 3. 运行数据库迁移 (Assuming Prisma based on DEVELOPMENT.md)
+npx prisma migrate dev # Or use `npm run db:migrate` if defined in package.json
 
 # 4. 启动前端开发服务器
 npm run dev
@@ -1154,7 +1155,7 @@ echo "Starting backup at $(date)"
 
 # 备份数据库
 echo "Backing up PostgreSQL database..."
-docker-compose exec -T postgres pg_dump -U netmon_user network_monitor | gzip > "$BACKUP_DIR/database_$DATE.sql.gz"
+docker-compose exec -T postgres pg_dump -U netmon_user network_monitor | gzip > "$BACKUP_DIR/database_$DATE.sql.gz" # DB name and user verified
 
 # 备份 Redis 数据
 echo "Backing up Redis data..."
@@ -1209,7 +1210,7 @@ if [ -f "$BACKUP_DIR/database_$BACKUP_DATE.sql.gz" ]; then
     echo "Restoring PostgreSQL database..."
     docker-compose up -d postgres
     sleep 10
-    gunzip -c "$BACKUP_DIR/database_$BACKUP_DATE.sql.gz" | docker-compose exec -T postgres psql -U netmon_user -d network_monitor
+    gunzip -c "$BACKUP_DIR/database_$BACKUP_DATE.sql.gz" | docker-compose exec -T postgres psql -U netmon_user -d network_monitor # DB name and user verified
 fi
 
 # 恢复 Redis 数据
@@ -1506,7 +1507,7 @@ git pull origin main
 docker-compose pull
 
 # 5. 运行数据库迁移（如果需要）
-docker-compose run --rm backend npm run migrate
+docker-compose run --rm backend npx prisma migrate deploy # For production, or `npx prisma migrate dev` if that's the flow
 
 # 6. 启动服务
 docker-compose up -d
@@ -1553,5 +1554,3 @@ docker-compose up -d
 欢迎提交 Pull Request 和 Issue，让我们一起完善这个项目！
 
 ---
-
-*最后更新时间: 2024年12月*

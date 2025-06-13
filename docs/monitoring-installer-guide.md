@@ -1,3 +1,4 @@
+<!-- WARNING: This guide may contain outdated information or references to components/scripts not directly part of the main mib-web-ui repository. It requires review and updates to align with the current project's monitoring deployment strategy, which primarily uses Docker Compose and potentially a UI-based installer feature. -->
 # 监控安装器完整使用手册
 
 ## 📖 目录
@@ -338,17 +339,19 @@ groups:
 
 #### 1. 下载安装脚本
 ```bash
-curl -fsSL https://raw.githubusercontent.com/your-repo/monitoring-installer/main/install.sh -o install.sh
-chmod +x install.sh
+# <!-- TODO: This installation method refers to an external script/repo. Verify relevance. -->
+# curl -fsSL https://raw.githubusercontent.com/your-repo/monitoring-installer/main/install.sh -o install.sh
+# chmod +x install.sh
 ```
 
 #### 2. 运行安装
 ```bash
-# 单机模式
-./install.sh --mode=standalone
-
-# 集群模式
-./install.sh --mode=cluster --nodes=3
+# <!-- TODO: This installation method refers to an external script/repo. Verify relevance. -->
+# # 单机模式
+# ./install.sh --mode=standalone
+#
+# # 集群模式
+# ./install.sh --mode=cluster --nodes=3
 ```
 
 #### 3. 访问界面
@@ -364,8 +367,9 @@ http://your-server:3001
 
 #### 1. 克隆代码库
 ```bash
-git clone https://github.com/your-repo/monitoring-installer.git
-cd monitoring-installer
+# <!-- TODO: This refers to an external repository. Verify relevance. -->
+# git clone https://github.com/your-repo/monitoring-installer.git
+# cd monitoring-installer
 ```
 
 #### 2. 配置环境变量
@@ -376,11 +380,12 @@ vim .env
 
 #### 3. 启动服务
 ```bash
-# 单机模式
-docker-compose -f docker-compose.standalone.yml up -d
-
-# 集群模式
-docker-compose -f docker-compose.cluster.yml up -d
+# <!-- TODO: These Docker Compose files are not present in the root. Refer to existing files like 'docker-compose.yml' or 'docker-compose.multiarch.yml' or specify how these should be obtained/created. -->
+# # 单机模式
+# docker-compose -f docker-compose.standalone.yml up -d
+#
+# # 集群模式
+# docker-compose -f docker-compose.cluster.yml up -d
 ```
 
 ## ⚙️ 配置说明
@@ -749,7 +754,7 @@ docker-compose down
 tar -xzf monitoring-installer-v2.0.tar.gz
 
 # 5. 迁移配置
-./migrate-config.sh
+# ./migrate-config.sh # <!-- TODO: Verify relevance of this script. -->
 
 # 6. 启动服务
 docker-compose up -d
@@ -761,9 +766,9 @@ docker-compose up -d
 ## 📞 技术支持
 
 ### 社区支持
-- GitHub Issues: https://github.com/your-repo/monitoring-installer/issues
-- 讨论论坛: https://forum.your-domain.com
-- 文档站点: https://docs.your-domain.com
+<!-- - GitHub Issues: https://github.com/your-repo/monitoring-installer/issues -->
+<!-- - 讨论论坛: https://forum.your-domain.com -->
+- 文档站点: https://docs.your-domain.com <!-- Keeping this one as it's generic -->
 
 ### 商业支持
 - 技术咨询: support@your-domain.com
@@ -773,5 +778,4 @@ docker-compose up -d
 ---
 
 **文档版本**: v1.0.0  
-**最后更新**: 2024-01-20  
 **维护者**: 监控团队

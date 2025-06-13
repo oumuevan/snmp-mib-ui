@@ -2,10 +2,13 @@
 
 一个现代化的 SNMP MIB 管理和监控 Web 应用程序，基于 Next.js 14 构建，提供直观的用户界面来管理和监控网络设备。
 
-## 🎯 [📋 快速导航索引](QUICK-START-INDEX.md) - 5分钟找到你需要的一切！
+## 🎯 <!-- TODO: [📋 快速导航索引](QUICK-START-INDEX.md) - 5分钟找到你需要的一切！ -->
 
-| 🚀 [快速部署](DEPLOYMENT-GUIDE.md#5分钟快速部署) | 🛠️ [开发指南](PROJECT-ENHANCEMENT-PLAN.md) | 🆘 [故障排查](DEPLOYMENT-GUIDE.md#故障排查) | 📚 [完整文档](DEPLOYMENT-GUIDE.md) |
+<!--
+| 🚀 [快速部署](DEPLOYMENT-GUIDE.md#5分钟快速部署) | 🛠️ TODO: [开发指南](PROJECT-ENHANCEMENT-PLAN.md) | 🆘 [故障排查](DEPLOYMENT-GUIDE.md#故障排查) | 📚 [完整文档](DEPLOYMENT-GUIDE.md) |
 |:---:|:---:|:---:|:---:|
+-->
+<!-- TODO: Project status link was PROJECT-STATUS.md -->
 
 一个现代化的 MIB (Management Information Base) 文件管理和 SNMP 操作平台，专为网络设备管理和监控而设计。
 
@@ -56,8 +59,10 @@ cd mib-web-ui
 部署完成后，访问以下地址：
 
 - **Web界面**: http://localhost:3000
-- **数据库**: localhost:5432 (用户名: netmon_user, 密码: netmon_pass_2024)
+- **数据库**: localhost:5432 (用户名: netmon_user, 密码: netmon_pass_2024) <!-- 默认密码仅供开发测试，生产环境请务必修改 -->
 - **Redis**: localhost:6379
+
+**重要提示**: 请务必修改所有默认密码，特别是数据库和 Redis 的密码，以确保系统安全。
 
 ## 📋 系统要求
 
@@ -91,7 +96,7 @@ cd mib-web-ui
 ```bash
 # 下载项目
 git clone <your-repo-url>
-cd web-ui
+cd mib-web-ui
 
 # 自动检测架构并部署
 bash deploy-multiarch.sh
@@ -124,7 +129,7 @@ bash deploy-china.sh
 ```bash
 # 克隆项目
 git clone <repository-url>
-cd web-ui
+cd mib-web-ui
 
 # 使用 Docker Compose 启动
 docker-compose up -d
@@ -188,9 +193,9 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ```bash
 # 数据库配置
-POSTGRES_DB=mibweb
-POSTGRES_USER=mibweb
-POSTGRES_PASSWORD=your_secure_password
+POSTGRES_DB=network_monitor
+POSTGRES_USER=netmon_user
+POSTGRES_PASSWORD=your_secure_password # 请修改为强密码
 
 # Redis 配置
 REDIS_PASSWORD=your_redis_password
@@ -286,31 +291,31 @@ sudo ufw allow 443/tcp
 
 ```bash
 # 启动服务
-mibweb start
+mibweb start <!-- TODO: Explain mibweb command setup -->
 
 # 停止服务
-mibweb stop
+mibweb stop <!-- TODO: Explain mibweb command setup -->
 
 # 重启服务
-mibweb restart
+mibweb restart <!-- TODO: Explain mibweb command setup -->
 
 # 查看状态
-mibweb status
+mibweb status <!-- TODO: Explain mibweb command setup -->
 
 # 查看日志
-mibweb logs [service]
+mibweb logs [service] <!-- TODO: Explain mibweb command setup -->
 
 # 创建备份
-mibweb backup
+mibweb backup <!-- TODO: Explain mibweb command setup -->
 
 # 更新应用
-mibweb update
+mibweb update <!-- TODO: Explain mibweb command setup -->
 
 # 健康检查
-mibweb health
+mibweb health <!-- TODO: Explain mibweb command setup -->
 
 # 清理资源
-mibweb clean
+mibweb clean <!-- TODO: Explain mibweb command setup -->
 ```
 
 ### 备份和恢复
@@ -332,7 +337,7 @@ ls -la /opt/mibweb-backups/
 **恢复数据**
 ```bash
 # 恢复数据库
-docker-compose exec postgres psql -U mibweb -d mibweb < /path/to/backup.sql
+docker-compose exec postgres psql -U netmon_user -d network_monitor < /path/to/backup.sql
 
 # 恢复 Redis 数据
 docker-compose exec redis redis-cli --rdb /path/to/backup.rdb
@@ -399,7 +404,7 @@ sudo netstat -tlnp | grep :8080
 **2. 数据库连接失败**
 ```bash
 # 检查数据库状态
-docker-compose exec postgres pg_isready -U mibweb
+docker-compose exec postgres pg_isready -U netmon_user
 
 # 查看数据库日志
 mibweb logs postgres
@@ -434,7 +439,7 @@ ls -la /opt/mibweb/uploads/
 EXPLAIN ANALYZE SELECT * FROM mibs WHERE name LIKE '%cisco%';
 
 -- 重建索引
-REINDEX DATABASE mibweb;
+REINDEX DATABASE network_monitor;
 
 -- 更新统计信息
 ANALYZE;
@@ -460,12 +465,12 @@ docker-compose exec redis redis-cli FLUSHEXPIRED
 ### 🚀 部署文档
 - [**📖 完整部署指南**](DEPLOYMENT-GUIDE.md) - 🌟 **最新！详尽的在线/离线部署手册**
 - [部署指南](DEPLOYMENT.md) - 基础部署说明
-- [离线部署](OFFLINE-DEPLOYMENT.md) - 离线环境部署指南
-- [快速上手](QUICK-OFFLINE-GUIDE.md) - 快速部署指南
+<!-- - [离线部署](OFFLINE-DEPLOYMENT.md) - 离线环境部署指南 -->
+<!-- - [快速上手](QUICK-OFFLINE-GUIDE.md) - 快速部署指南 -->
 
 ### 🛠️ 开发文档
-- [**🎯 项目完善计划**](PROJECT-ENHANCEMENT-PLAN.md) - 🌟 **功能增强与优化路线图**
-- [**📊 项目状态总览**](PROJECT-STATUS.md) - 🌟 **实时项目进度和质量指标**
+<!-- - [**🎯 项目完善计划**](PROJECT-ENHANCEMENT-PLAN.md) - 🌟 **功能增强与优化路线图** -->
+<!-- - [**📊 项目状态总览**](PROJECT-STATUS.md) - 🌟 **实时项目进度和质量指标** -->
 - [**📋 版本更新日志**](CHANGELOG.md) - 🌟 **版本历史和更新内容**
 - [API 文档](docs/API.md) - API 接口说明
 - [开发指南](docs/DEVELOPMENT.md) - 开发环境搭建
@@ -476,7 +481,7 @@ docker-compose exec redis redis-cli FLUSHEXPIRED
 
 **前端开发**
 ```bash
-cd frontend
+# cd frontend # No longer needed if frontend is in root or package.json scripts handle paths
 npm install
 npm run dev
 ```
@@ -500,7 +505,7 @@ go run migrate.go down
 ### API 文档
 
 - **Swagger UI**: http://localhost:8080/docs
-- **API 规范**: `/docs/api.yaml`
+- **API 规范**: `docs/API.md`
 
 ### 贡献指南
 

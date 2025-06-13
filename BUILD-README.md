@@ -90,6 +90,7 @@ bash build-local-deps.sh --include-monitoring --verbose
 1. 构建完整版本
 2. 一键部署所有组件
 3. 直接使用完整的监控平台
+<!-- TODO: Clarify if components installed by 'build-local-deps.sh --include-monitoring' are precisely the same set and configuration as those managed by the '监控安装器' (Monitoring Installer UI/feature). Ensure consistency in terminology and component lists. -->
 
 ## 监控组件说明
 
@@ -131,5 +132,6 @@ A:
 
 如有问题，请查看：
 - [部署指南](./DEPLOYMENT-GUIDE.md)
-- [快速开始](./docs/quick-start.md)
+<!-- TODO: Verify or create linked document [docs/quick-start.md] -->
+<!-- - [快速开始](./docs/quick-start.md) -->
 - [故障排除](./docs/troubleshooting.md)
