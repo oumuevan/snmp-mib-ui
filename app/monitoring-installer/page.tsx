@@ -18,47 +18,123 @@ import {
   BarChart3, 
   Monitor,
   Activity,
-  RefreshCw
+  RefreshCw,
+  Bell, // Added for VMAlert, Alertmanager (already AlertCircle, Bell is an alternative)
+  Network // Added for SNMP Exporter, Categraf (Server is also fine)
 } from 'lucide-react'
+
+// Data from ComponentDetails.tsx (COMPONENT_CONFIGS) - simplified for this update
+// In a real scenario, this would likely be imported or fetched
+const allMonitoringComponentsConfig = {
+  'node-exporter': {
+    id: 'node-exporter',
+    name: 'Node Exporter',
+    description: '系统指标采集器，收集CPU、内存、磁盘等系统指标', // System metrics collector
+    category: 'collector',
+    versions: [{ version: '1.7.0', isLatest: true }],
+  },
+  'categraf': {
+    id: 'categraf',
+    name: 'Categraf',
+    description: '多功能指标采集器，支持多种数据源', // Multi-functional metrics collector
+    category: 'collector',
+    versions: [{ version: '0.3.60', isLatest: true }],
+  },
+  'vmagent': {
+    id: 'vmagent',
+    name: 'VMAgent',
+    description: '轻量级指标代理，负责指标收集和转发', // Lightweight metrics agent
+    category: 'collector',
+    versions: [{ version: '1.96.0', isLatest: true }],
+  },
+  'victoriametrics': {
+    id: 'victoriametrics',
+    name: 'VictoriaMetrics',
+    description: 'VictoriaMetrics单机版，高性能时序数据库', // High-performance time-series database (single-node)
+    category: 'storage',
+    versions: [{ version: '1.96.0', isLatest: true }],
+  },
+  'vmstorage': {
+    id: 'vmstorage',
+    name: 'VMStorage',
+    description: 'VictoriaMetrics集群存储节点', // VictoriaMetrics cluster storage node
+    category: 'storage',
+    versions: [{ version: '1.96.0', isLatest: true }],
+  },
+  'vminsert': {
+    id: 'vminsert',
+    name: 'VMInsert',
+    description: 'VictoriaMetrics集群插入节点', // VictoriaMetrics cluster insert node
+    category: 'storage',
+    versions: [{ version: '1.96.0', isLatest: true }],
+  },
+  'vmselect': {
+    id: 'vmselect',
+    name: 'VMSelect',
+    description: 'VictoriaMetrics集群查询节点', // VictoriaMetrics cluster query node
+    category: 'storage',
+    versions: [{ version: '1.96.0', isLatest: true }],
+  },
+  'vmalert': {
+    id: 'vmalert',
+    name: 'VMAlert',
+    description: 'VictoriaMetrics告警组件', // VictoriaMetrics alerting component
+    category: 'alerting',
+    versions: [{ version: '1.96.0', isLatest: true }],
+  },
+  'grafana': {
+    id: 'grafana',
+    name: 'Grafana',
+    description: '数据可视化和监控面板', // Data visualization and monitoring dashboard
+    category: 'visualization',
+    versions: [{ version: '10.2.3', isLatest: true }],
+  },
+  'snmp-exporter': {
+    id: 'snmp-exporter',
+    name: 'SNMP Exporter',
+    description: 'SNMP设备监控导出器', // SNMP device monitoring exporter
+    category: 'collector',
+    versions: [{ version: '0.24.1', isLatest: true }],
+  },
+  'alertmanager': {
+    id: 'alertmanager',
+    name: 'Alertmanager',
+    description: '告警管理和通知系统', // Alert management and notification system
+    category: 'alerting',
+    versions: [{ version: '0.26.0', isLatest: true }],
+  }
+};
+
+const getIconForCategory = (category: string) => {
+  switch (category) {
+    case 'collector':
+      return Server; // Using Server for collectors like Node Exporter, Categraf, SNMP Exporter, VMAgent
+    case 'storage':
+      return Database; // For VictoriaMetrics and its storage components
+    case 'visualization':
+      return BarChart3; // For Grafana
+    case 'alerting':
+      return Bell; // Using Bell for Alertmanager, VMAlert (AlertCircle also an option)
+    default:
+      return Settings; // Default icon
+  }
+};
 
 export default function MonitoringInstaller() {
   const [isInstalling, setIsInstalling] = useState(false)
   const [installProgress, setInstallProgress] = useState(0)
 
-  const components = [
-    {
-      id: 'prometheus',
-      name: 'Prometheus',
-      description: '时序数据库和监控系统',
-      icon: Database,
-      status: 'available',
-      version: '2.45.0'
-    },
-    {
-      id: 'grafana',
-      name: 'Grafana',
-      description: '可视化和分析平台',
-      icon: BarChart3,
-      status: 'available',
-      version: '10.0.0'
-    },
-    {
-      id: 'alertmanager',
-      name: 'Alertmanager',
-      description: '告警管理系统',
-      icon: AlertCircle,
-      status: 'available',
-      version: '0.25.0'
-    },
-    {
-      id: 'node-exporter',
-      name: 'Node Exporter',
-      description: '系统指标收集器',
-      icon: Server,
-      status: 'available',
-      version: '1.6.0'
-    }
-  ]
+  const components = Object.values(allMonitoringComponentsConfig).map(comp => {
+    const latestVersion = comp.versions.find(v => v.isLatest) || comp.versions[0];
+    return {
+      id: comp.id,
+      name: comp.name,
+      description: comp.description, // Assuming description is already in the desired language or a key
+      icon: getIconForCategory(comp.category),
+      status: 'available', // Default status
+      version: latestVersion ? latestVersion.version : 'N/A'
+    };
+  });
 
   const handleInstall = (componentId: string) => {
     setIsInstalling(true)
@@ -126,7 +202,7 @@ export default function MonitoringInstaller() {
         </TabsList>
 
         <TabsContent value="components" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"> {/* Adjusted grid for more items */}
             {components.map((component) => {
               const Icon = component.icon
               return (
@@ -139,7 +215,7 @@ export default function MonitoringInstaller() {
                     <Badge variant="secondary">v{component.version}</Badge>
                   </CardHeader>
                   <CardContent>
-                    <CardDescription className="mb-4">
+                    <CardDescription className="mb-4 h-10"> {/* Added fixed height for description */}
                       {component.description}
                     </CardDescription>
                     <div className="flex items-center justify-between">
@@ -181,7 +257,21 @@ export default function MonitoringInstaller() {
                 <div className="p-4 border rounded-lg">
                   <h4 className="font-medium">完整监控</h4>
                   <p className="text-sm text-muted-foreground mt-1">
-                    包含所有监控组件和告警系统
+                    包含所有主要监控组件和告警系统
+                  </p>
+                  <Button className="mt-3" size="sm">选择模板</Button>
+                </div>
+                 <div className="p-4 border rounded-lg">
+                  <h4 className="font-medium">VictoriaMetrics 栈</h4>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    包含 VictoriaMetrics 单机版, VMAgent, Grafana
+                  </p>
+                  <Button className="mt-3" size="sm">选择模板</Button>
+                </div>
+                <div className="p-4 border rounded-lg">
+                  <h4 className="font-medium">VictoriaMetrics 集群基础</h4>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    包含 VMStorage, VMInsert, VMSelect, VMAgent, Grafana
                   </p>
                   <Button className="mt-3" size="sm">选择模板</Button>
                 </div>
@@ -216,7 +306,7 @@ export default function MonitoringInstaller() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span>已安装组件</span>
-                  <span className="text-sm text-muted-foreground">0 / 4</span>
+                  <span className="text-sm text-muted-foreground">0 / {components.length}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>最后检查</span>
