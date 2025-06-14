@@ -71,62 +71,33 @@ func RegisterAlertRulesRoutes(r *gin.Engine, controller *controllers.AlertRulesC
 		deviceGroups.DELETE("/batch", controller.BatchDeleteDeviceGroups) // 批量删除设备分组
 	}
 
-	// Alertmanager配置API组
+	// Alertmanager配置API组 (简化版本)
 	alertmanager := r.Group("/api/v1/alertmanager")
 	alertmanager.Use(middleware.CORS())
 
 	{
 		alertmanager.GET("/config", controller.GetAlertmanagerConfig)     // 获取Alertmanager配置
 		alertmanager.PUT("/config", controller.UpdateAlertmanagerConfig)  // 更新Alertmanager配置
-		alertmanager.POST("/config/validate", controller.ValidateAlertmanagerConfig) // 验证配置
-		alertmanager.POST("/config/preview", controller.PreviewAlertmanagerConfig)   // 预览配置
-		alertmanager.GET("/config/export", controller.ExportAlertmanagerConfig)      // 导出配置
-
-		// 路由规则
-		alertmanager.GET("/routes", controller.GetRoutes)              // 获取路由规则
-		alertmanager.POST("/routes/test", controller.TestRoute)        // 测试路由规则
-
-		// 接收器管理
-		alertmanager.GET("/receivers", controller.GetReceivers)        // 获取接收器列表
-		alertmanager.POST("/receivers", controller.CreateReceiver)     // 创建接收器
-		alertmanager.PUT("/receivers/:name", controller.UpdateReceiver) // 更新接收器
-		alertmanager.DELETE("/receivers/:name", controller.DeleteReceiver) // 删除接收器
-		alertmanager.POST("/receivers/:name/test", controller.TestReceiver) // 测试接收器
-
-		// 静默管理
-		alertmanager.GET("/silences", controller.GetSilences)          // 获取静默列表
-		alertmanager.POST("/silences", controller.CreateSilence)       // 创建静默
-		alertmanager.DELETE("/silences/:id", controller.DeleteSilence) // 删除静默
 	}
 
-	// 配置同步API组
+	// 配置同步API组 (简化版本)
 	sync := r.Group("/api/v1/sync")
 	sync.Use(middleware.CORS())
 
 	{
 		sync.POST("/config", controller.SyncConfig)                   // 同步配置
 		sync.GET("/history", controller.GetSyncHistory)               // 获取同步历史
-		sync.GET("/status", controller.GetSyncStatus)                 // 获取同步状态
-		sync.POST("/rollback/:id", controller.RollbackConfig)         // 回滚配置
 	}
 
-	// 设备发现API组
+	// 设备发现API组 (简化版本)
 	discovery := r.Group("/api/v1/discovery")
 	discovery.Use(middleware.CORS())
 
 	{
 		discovery.POST("/scan", controller.DiscoverDevices)           // 扫描发现设备
-		discovery.GET("/devices", controller.GetDiscoveredDevices)    // 获取发现的设备
-		discovery.POST("/devices/:id/monitor", controller.AddToMonitoring) // 添加到监控
-		discovery.DELETE("/devices/:id", controller.RemoveDiscoveredDevice) // 移除发现的设备
-		discovery.GET("/coverage", controller.GetMonitoringCoverage)  // 获取监控覆盖率报告
-		discovery.GET("/rules", controller.GetDiscoveryRules)         // 获取发现规则
-		discovery.POST("/rules", controller.CreateDiscoveryRule)      // 创建发现规则
-		discovery.PUT("/rules/:id", controller.UpdateDiscoveryRule)   // 更新发现规则
-		discovery.DELETE("/rules/:id", controller.DeleteDiscoveryRule) // 删除发现规则
 	}
 
-	// 智能推荐API组
+	// 智能推荐API组 (简化版本)
 	recommendations := r.Group("/api/v1/recommendations")
 	recommendations.Use(middleware.CORS())
 
@@ -135,36 +106,5 @@ func RegisterAlertRulesRoutes(r *gin.Engine, controller *controllers.AlertRulesC
 		recommendations.POST("/generate", controller.GenerateRecommendations) // 生成推荐
 		recommendations.POST("/:id/apply", controller.ApplyRecommendation)     // 应用推荐
 		recommendations.POST("/:id/reject", controller.RejectRecommendation)   // 拒绝推荐
-		recommendations.DELETE("/:id", controller.DeleteRecommendation)        // 删除推荐
-		recommendations.GET("/history", controller.GetRecommendationHistory)  // 获取推荐历史
-		recommendations.GET("/analysis", controller.GetAnalysisReport)        // 获取分析报告
-		recommendations.GET("/settings", controller.GetRecommendationSettings) // 获取推荐设置
-		recommendations.PUT("/settings", controller.UpdateRecommendationSettings) // 更新推荐设置
-	}
-
-	// 统计分析API组
-	stats := r.Group("/api/v1/alert-stats")
-	stats.Use(middleware.CORS())
-
-	{
-		stats.GET("/overview", controller.GetStatsOverview)           // 获取统计概览
-		stats.GET("/rules", controller.GetRuleStats)                  // 获取规则统计
-		stats.GET("/alerts", controller.GetAlertStats)                // 获取告警统计
-		stats.GET("/performance", controller.GetPerformanceStats)     // 获取性能统计
-		stats.GET("/trends", controller.GetTrendAnalysis)             // 获取趋势分析
-		stats.GET("/top-rules", controller.GetTopRules)               // 获取热门规则
-		stats.GET("/slow-queries", controller.GetSlowQueries)         // 获取慢查询规则
-	}
-
-	// 健康检查和调试API
-	health := r.Group("/api/v1/alert-health")
-	health.Use(middleware.CORS())
-
-	{
-		health.GET("/check", controller.HealthCheck)                 // 健康检查
-		health.GET("/metrics", controller.GetHealthMetrics)          // 获取健康指标
-		health.GET("/connectivity", controller.CheckConnectivity)    // 检查连通性
-		health.POST("/test-rule", controller.TestRule)               // 测试规则
-		health.POST("/test-template", controller.TestTemplate)       // 测试模板
 	}
 }

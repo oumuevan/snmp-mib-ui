@@ -1,14 +1,13 @@
 package controllers
 
 import (
-	"crypto/md5"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
-	"time"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
@@ -83,6 +82,86 @@ func (c *MIBController) CreateMIB(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, gin.H{"data": mib})
 }
 
+// 上传 MIB 文件
+func (c *MIBController) UploadMIB(ctx *gin.Context) {
+	file, header, err := ctx.Request.FormFile("file")
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "No file uploaded"})
+		return
+	}
+	defer file.Close()
+
+	// 验证文件类型
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	if ext != ".mib" && ext != ".txt" && ext != ".my" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file type. Only .mib, .txt, .my files are allowed"})
+		return
+	}
+
+	// 上传并解析 MIB 文件
+	mib, err := c.service.UploadAndParseMIB(file, header)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, gin.H{
+		"message": "MIB file uploaded and parsed successfully",
+		"data":    mib,
+	})
+}
+
+// 扫描 MIB 目录
+func (c *MIBController) ScanMIBDirectory(ctx *gin.Context) {
+	dirPath := ctx.Query("path")
+	if dirPath == "" {
+		dirPath = "/opt/monitoring/mibs"
+	}
+
+	files, err := c.service.ScanMIBDirectory(dirPath)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"directory": dirPath,
+		"files":     files,
+		"count":     len(files),
+	})
+}
+
+// 解析指定的 MIB 文件
+func (c *MIBController) ParseMIBFile(ctx *gin.Context) {
+	var request struct {
+		FilePath string `json:"file_path" binding:"required"`
+	}
+
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(request.FilePath); os.IsNotExist(err) {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+		return
+	}
+
+	// 解析 MIB 文件
+	oids, err := c.service.ParseMIB(request.FilePath)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"file_path": request.FilePath,
+		"oids":      oids,
+		"count":     len(oids),
+	})
+}
+
 func (c *MIBController) UpdateMIB(ctx *gin.Context) {
 	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
 	if err != nil {
@@ -120,67 +199,7 @@ func (c *MIBController) DeleteMIB(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"message": "MIB deleted successfully"})
 }
 
-func (c *MIBController) UploadMIB(ctx *gin.Context) {
-	file, header, err := ctx.Request.FormFile("file")
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "No file uploaded"})
-		return
-	}
-	defer file.Close()
 
-	// Create upload directory if it doesn't exist
-	uploadDir := "./uploads/mibs"
-	if err := os.MkdirAll(uploadDir, 0755); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
-		return
-	}
-
-	// Generate unique filename
-	filename := fmt.Sprintf("%d_%s", time.Now().Unix(), header.Filename)
-	filepath := filepath.Join(uploadDir, filename)
-
-	// Save file
-	dst, err := os.Create(filepath)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
-		return
-	}
-	defer dst.Close()
-
-	// Calculate checksum
-	hash := md5.New()
-	size, err := io.Copy(io.MultiWriter(dst, hash), file)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
-		return
-	}
-
-	checksum := fmt.Sprintf("%x", hash.Sum(nil))
-
-	// Create MIB record
-	mib := models.MIB{
-		Name:        header.Filename,
-		Filename:    header.Filename,
-		FilePath:    filepath,
-		Status:      "uploaded",
-		FileSize:    size,
-		Checksum:    checksum,
-		Description: ctx.PostForm("description"),
-		Author:      ctx.PostForm("author"),
-	}
-
-	if err := c.service.CreateMIB(&mib); err != nil {
-		// Clean up file if database operation fails
-		os.Remove(filepath)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "MIB uploaded successfully",
-		"data":    mib,
-	})
-}
 
 func (c *MIBController) ParseMIB(ctx *gin.Context) {
 	result, err := c.service.ParseMIB(ctx.Param("id"))

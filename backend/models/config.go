@@ -11,6 +11,7 @@ type Config struct {
 	Name        string           `json:"name" gorm:"not null"`
 	Type        string           `json:"type" gorm:"not null"` // prometheus, zabbix, etc.
 	Content     string           `json:"content" gorm:"type:text"`
+	FilePath    string           `json:"file_path"`
 	DeviceID    *uint            `json:"device_id"`
 	Device      *Device          `json:"device" gorm:"foreignKey:DeviceID"`
 	TemplateID  *uint            `json:"template_id"`

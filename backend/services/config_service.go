@@ -3,10 +3,15 @@ package services
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/go-redis/redis/v8"
+	"gopkg.in/yaml.v3"
 	"gorm.io/gorm"
 
 	"mib-platform/models"
@@ -75,51 +80,374 @@ func (s *ConfigService) DeleteConfig(id uint) error {
 	return s.db.Delete(&models.Config{}, id).Error
 }
 
-func (s *ConfigService) GenerateConfig(configType string, deviceID, templateID *uint, oids []string, options map[string]interface{}) (*models.Config, error) {
-	var device *models.Device
-	var configTemplate *models.ConfigTemplate
+// 配置生成请求结构
+type ConfigGenerationRequest struct {
+	ConfigType   string                 `json:"config_type"`
+	ConfigName   string                 `json:"config_name"`
+	DeviceInfo   DeviceInfo            `json:"device_info"`
+	SelectedOIDs []string              `json:"selected_oids"`
+	Template     string                 `json:"template"`
+	Options      map[string]interface{} `json:"options"`
+}
 
-	// Load device if specified
-	if deviceID != nil {
-		if err := s.db.Preload("Credentials").First(&device, *deviceID).Error; err != nil {
-			return nil, fmt.Errorf("device not found: %v", err)
-		}
+type DeviceInfo struct {
+	IP        string `json:"ip"`
+	Community string `json:"community"`
+	Version   string `json:"version"`
+	Name      string `json:"name,omitempty"`
+	Port      int    `json:"port,omitempty"`
+}
+
+// SNMP Exporter 配置结构
+type SNMPExporterConfig struct {
+	Modules map[string]SNMPModule `yaml:"modules"`
+}
+
+type SNMPModule struct {
+	Walk    []string          `yaml:"walk"`
+	Metrics []SNMPMetric      `yaml:"metrics"`
+	Auth    SNMPAuth          `yaml:"auth"`
+	Version int               `yaml:"version"`
+	Timeout string            `yaml:"timeout,omitempty"`
+	Retries int               `yaml:"retries,omitempty"`
+}
+
+type SNMPMetric struct {
+	Name    string            `yaml:"name"`
+	OID     string            `yaml:"oid"`
+	Type    string            `yaml:"type"`
+	Help    string            `yaml:"help"`
+	Indexes []SNMPIndex       `yaml:"indexes,omitempty"`
+	Lookups []SNMPLookup      `yaml:"lookups,omitempty"`
+}
+
+type SNMPIndex struct {
+	LabelName string `yaml:"labelname"`
+	Type      string `yaml:"type"`
+}
+
+type SNMPLookup struct {
+	Labels    []string `yaml:"labels"`
+	LabelName string   `yaml:"labelname"`
+	OID       string   `yaml:"oid"`
+	Type      string   `yaml:"type"`
+}
+
+type SNMPAuth struct {
+	Community string `yaml:"community"`
+}
+
+// Categraf SNMP 配置结构
+type CategrafSNMPConfig struct {
+	Instances []CategrafSNMPInstance `toml:"instances"`
+}
+
+type CategrafSNMPInstance struct {
+	Agents    []string              `toml:"agents"`
+	Version   int                   `toml:"version"`
+	Community string                `toml:"community"`
+	Fields    []CategrafSNMPField   `toml:"field"`
+	Tables    []CategrafSNMPTable   `toml:"table"`
+	Timeout   string                `toml:"timeout"`
+	Retries   int                   `toml:"retries"`
+}
+
+type CategrafSNMPField struct {
+	Name string `toml:"name"`
+	OID  string `toml:"oid"`
+}
+
+type CategrafSNMPTable struct {
+	Name   string                `toml:"name"`
+	OID    string                `toml:"oid"`
+	Fields []CategrafSNMPField   `toml:"field"`
+}
+
+func (s *ConfigService) GenerateConfig(req ConfigGenerationRequest) (*models.Config, error) {
+	var configContent string
+	var err error
+
+	// 根据配置类型生成不同格式的配置
+	switch req.ConfigType {
+	case "snmp_exporter":
+		configContent, err = s.generateSNMPExporterConfig(req)
+	case "categraf":
+		configContent, err = s.generateCategrafConfig(req)
+	default:
+		return nil, fmt.Errorf("unsupported config type: %s", req.ConfigType)
 	}
 
-	// Load template if specified
-	if templateID != nil {
-		if err := s.db.First(&configTemplate, *templateID).Error; err != nil {
-			return nil, fmt.Errorf("template not found: %v", err)
-		}
-	} else {
-		// Use default template for the config type
-		if err := s.db.Where("type = ? AND is_default = ?", configType, true).First(&configTemplate).Error; err != nil {
-			return nil, fmt.Errorf("no default template found for type: %s", configType)
-		}
-	}
-
-	// Generate configuration content
-	content, err := s.generateConfigContent(configTemplate, device, oids, options)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to generate config: %v", err)
 	}
 
-	// Create config record
+	// 创建配置记录
 	config := &models.Config{
-		Name:       fmt.Sprintf("%s_config_%d", configType, device.ID),
-		Type:       configType,
-		Content:    content,
-		DeviceID:   deviceID,
-		TemplateID: &configTemplate.ID,
-		Status:     "generated",
-		Version:    "1.0",
+		Name:        req.ConfigName,
+		Type:        req.ConfigType,
+		Content:     configContent,
+		Status:      "generated",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 
-	if err := s.CreateConfig(config); err != nil {
-		return nil, err
+	// 保存到数据库
+	if err := s.db.Create(config).Error; err != nil {
+		return nil, fmt.Errorf("failed to save config: %v", err)
 	}
 
 	return config, nil
+}
+
+// 生成 SNMP Exporter 配置
+func (s *ConfigService) generateSNMPExporterConfig(req ConfigGenerationRequest) (string, error) {
+	// 获取 OID 信息
+	oidMetrics, err := s.getOIDMetrics(req.SelectedOIDs)
+	if err != nil {
+		return "", fmt.Errorf("failed to get OID metrics: %v", err)
+	}
+
+	// 构建 SNMP Exporter 配置
+	config := SNMPExporterConfig{
+		Modules: map[string]SNMPModule{
+			req.ConfigName: {
+				Walk:    req.SelectedOIDs,
+				Metrics: oidMetrics,
+				Auth: SNMPAuth{
+					Community: req.DeviceInfo.Community,
+				},
+				Version: s.getSNMPVersion(req.DeviceInfo.Version),
+				Timeout: "5s",
+				Retries: 3,
+			},
+		},
+	}
+
+	// 转换为 YAML
+	yamlData, err := yaml.Marshal(config)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal YAML: %v", err)
+	}
+
+	return string(yamlData), nil
+}
+
+// 生成 Categraf 配置
+func (s *ConfigService) generateCategrafConfig(req ConfigGenerationRequest) (string, error) {
+	// 构建 Categraf 配置
+	var fields []CategrafSNMPField
+	for _, oid := range req.SelectedOIDs {
+		// 获取 OID 名称
+		name, err := s.getOIDName(oid)
+		if err != nil {
+			name = strings.ReplaceAll(oid, ".", "_")
+		}
+		
+		fields = append(fields, CategrafSNMPField{
+			Name: name,
+			OID:  oid,
+		})
+	}
+
+	// 创建 Categraf SNMP 配置结构（用于参考）
+	_ = CategrafSNMPConfig{
+		Instances: []CategrafSNMPInstance{
+			{
+				Agents:    []string{req.DeviceInfo.IP},
+				Version:   s.getSNMPVersion(req.DeviceInfo.Version),
+				Community: req.DeviceInfo.Community,
+				Fields:    fields,
+				Timeout:   "5s",
+				Retries:   3,
+			},
+		},
+	}
+
+	// 转换为 TOML 格式（简化实现）
+	var buf bytes.Buffer
+	buf.WriteString("[[instances]]\n")
+	buf.WriteString(fmt.Sprintf("agents = [\"%s\"]\n", req.DeviceInfo.IP))
+	buf.WriteString(fmt.Sprintf("version = %d\n", s.getSNMPVersion(req.DeviceInfo.Version)))
+	buf.WriteString(fmt.Sprintf("community = \"%s\"\n", req.DeviceInfo.Community))
+	buf.WriteString("timeout = \"5s\"\n")
+	buf.WriteString("retries = 3\n\n")
+
+	for _, field := range fields {
+		buf.WriteString("[[instances.field]]\n")
+		buf.WriteString(fmt.Sprintf("name = \"%s\"\n", field.Name))
+		buf.WriteString(fmt.Sprintf("oid = \"%s\"\n", field.OID))
+		buf.WriteString("\n")
+	}
+
+	return buf.String(), nil
+}
+
+// 获取 OID 指标信息
+func (s *ConfigService) getOIDMetrics(oids []string) ([]SNMPMetric, error) {
+	var metrics []SNMPMetric
+
+	for _, oid := range oids {
+		var oidModel models.OID
+		if err := s.db.Where("oid = ?", oid).First(&oidModel).Error; err != nil {
+			// 如果数据库中没有找到，使用默认值
+			metrics = append(metrics, SNMPMetric{
+				Name: strings.ReplaceAll(oid, ".", "_"),
+				OID:  oid,
+				Type: "gauge",
+				Help: fmt.Sprintf("SNMP metric for OID %s", oid),
+			})
+			continue
+		}
+
+		// 根据 SNMP 类型确定 Prometheus 类型
+		promType := s.getPrometheusType(oidModel.Type)
+		
+		metrics = append(metrics, SNMPMetric{
+			Name: oidModel.Name,
+			OID:  oid,
+			Type: promType,
+			Help: oidModel.Description,
+		})
+	}
+
+	return metrics, nil
+}
+
+// 获取 OID 名称
+func (s *ConfigService) getOIDName(oid string) (string, error) {
+	var oidModel models.OID
+	if err := s.db.Where("oid = ?", oid).First(&oidModel).Error; err != nil {
+		return "", err
+	}
+	return oidModel.Name, nil
+}
+
+// 转换 SNMP 版本
+func (s *ConfigService) getSNMPVersion(version string) int {
+	switch strings.ToLower(version) {
+	case "v1", "1":
+		return 1
+	case "v2c", "2c", "2":
+		return 2
+	case "v3", "3":
+		return 3
+	default:
+		return 2 // 默认使用 v2c
+	}
+}
+
+// 转换为 Prometheus 指标类型
+func (s *ConfigService) getPrometheusType(snmpType string) string {
+	switch strings.ToLower(snmpType) {
+	case "counter", "counter32", "counter64":
+		return "counter"
+	case "gauge", "gauge32", "integer32", "unsigned32":
+		return "gauge"
+	case "timeticks":
+		return "counter"
+	default:
+		return "gauge"
+	}
+}
+
+// 保存配置到文件系统
+func (s *ConfigService) SaveConfigToFile(config *models.Config, targetPath string) error {
+	// 确保目标目录存在
+	dir := filepath.Dir(targetPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %v", err)
+	}
+
+	// 写入文件
+	if err := ioutil.WriteFile(targetPath, []byte(config.Content), 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %v", err)
+	}
+
+	// 更新配置记录中的文件路径
+	config.FilePath = targetPath
+	if err := s.db.Save(config).Error; err != nil {
+		return fmt.Errorf("failed to update config record: %v", err)
+	}
+
+	return nil
+}
+
+// 合并配置到现有文件
+func (s *ConfigService) MergeConfigToFile(config *models.Config, targetPath string) error {
+	var existingContent []byte
+	var err error
+
+	// 读取现有文件（如果存在）
+	if _, err := os.Stat(targetPath); err == nil {
+		existingContent, err = ioutil.ReadFile(targetPath)
+		if err != nil {
+			return fmt.Errorf("failed to read existing config: %v", err)
+		}
+	}
+
+	// 根据配置类型进行合并
+	var mergedContent string
+	switch config.Type {
+	case "snmp_exporter":
+		mergedContent, err = s.mergeSNMPExporterConfig(string(existingContent), config.Content)
+	case "categraf":
+		mergedContent, err = s.mergeCategrafConfig(string(existingContent), config.Content)
+	default:
+		return fmt.Errorf("unsupported config type for merging: %s", config.Type)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to merge config: %v", err)
+	}
+
+	// 写入合并后的配置
+	if err := ioutil.WriteFile(targetPath, []byte(mergedContent), 0644); err != nil {
+		return fmt.Errorf("failed to write merged config: %v", err)
+	}
+
+	return nil
+}
+
+// 合并 SNMP Exporter 配置
+func (s *ConfigService) mergeSNMPExporterConfig(existing, new string) (string, error) {
+	var existingConfig, newConfig SNMPExporterConfig
+
+	// 解析现有配置
+	if existing != "" {
+		if err := yaml.Unmarshal([]byte(existing), &existingConfig); err != nil {
+			return "", fmt.Errorf("failed to parse existing config: %v", err)
+		}
+	} else {
+		existingConfig.Modules = make(map[string]SNMPModule)
+	}
+
+	// 解析新配置
+	if err := yaml.Unmarshal([]byte(new), &newConfig); err != nil {
+		return "", fmt.Errorf("failed to parse new config: %v", err)
+	}
+
+	// 合并模块
+	for name, module := range newConfig.Modules {
+		existingConfig.Modules[name] = module
+	}
+
+	// 转换回 YAML
+	mergedData, err := yaml.Marshal(existingConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal merged config: %v", err)
+	}
+
+	return string(mergedData), nil
+}
+
+// 合并 Categraf 配置
+func (s *ConfigService) mergeCategrafConfig(existing, new string) (string, error) {
+	// 简单的文本合并（实际应用中可能需要更复杂的逻辑）
+	if existing == "" {
+		return new, nil
+	}
+	
+	return existing + "\n\n" + new, nil
 }
 
 func (s *ConfigService) ValidateConfig(id uint) (map[string]interface{}, error) {

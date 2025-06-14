@@ -1,11 +1,18 @@
 package services
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 	"gorm.io/gorm"
@@ -79,20 +86,262 @@ func (s *MIBService) DeleteMIB(id uint) error {
 	return s.db.Delete(&models.MIB{}, id).Error
 }
 
-func (s *MIBService) ParseMIB(filePath string) ([]models.OID, error) {
-	// Read MIB file
+// MIB 解析结构
+type MIBParseResult struct {
+	OID         string `json:"oid"`
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Access      string `json:"access"`
+	Description string `json:"description"`
+	Status      string `json:"status"`
+	Module      string `json:"module"`
+}
+
+// 扫描指定目录中的 MIB 文件
+func (s *MIBService) ScanMIBDirectory(dirPath string) ([]string, error) {
+	if dirPath == "" {
+		dirPath = "/opt/monitoring/mibs" // 默认目录
+	}
+
+	var mibFiles []string
+	
+	// 检查目录是否存在
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		// 如果目录不存在，创建它
+		if err := os.MkdirAll(dirPath, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create MIB directory: %v", err)
+		}
+		return mibFiles, nil
+	}
+
+	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// 检查文件扩展名
+		ext := strings.ToLower(filepath.Ext(path))
+		if ext == ".mib" || ext == ".txt" || ext == ".my" {
+			mibFiles = append(mibFiles, path)
+		}
+
+		return nil
+	})
+
+	return mibFiles, err
+}
+
+// 使用 snmptranslate 解析 MIB 文件
+func (s *MIBService) ParseMIBWithSNMPTranslate(filePath string) ([]MIBParseResult, error) {
+	var results []MIBParseResult
+
+	// 首先尝试使用 snmptranslate 获取所有 OID
+	cmd := exec.Command("snmptranslate", "-Td", "-OS", "-m", filePath)
+	output, err := cmd.Output()
+	if err != nil {
+		// 如果 snmptranslate 不可用，使用备用解析方法
+		return s.parseMIBContentFallback(filePath)
+	}
+
+	// 解析 snmptranslate 输出
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	var currentOID MIBParseResult
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		
+		if strings.Contains(line, "::") {
+			// 新的 OID 定义开始
+			if currentOID.Name != "" {
+				results = append(results, currentOID)
+			}
+			currentOID = MIBParseResult{}
+			
+			// 解析 OID 名称和数字
+			parts := strings.Split(line, "::")
+			if len(parts) >= 2 {
+				currentOID.Name = strings.TrimSpace(parts[0])
+				oidPart := strings.TrimSpace(parts[1])
+				// 提取 OID 数字
+				re := regexp.MustCompile(`\d+(\.\d+)*`)
+				if match := re.FindString(oidPart); match != "" {
+					currentOID.OID = match
+				}
+			}
+		} else if strings.HasPrefix(line, "SYNTAX") {
+			currentOID.Type = strings.TrimSpace(strings.TrimPrefix(line, "SYNTAX"))
+		} else if strings.HasPrefix(line, "ACCESS") {
+			currentOID.Access = strings.TrimSpace(strings.TrimPrefix(line, "ACCESS"))
+		} else if strings.HasPrefix(line, "STATUS") {
+			currentOID.Status = strings.TrimSpace(strings.TrimPrefix(line, "STATUS"))
+		} else if strings.HasPrefix(line, "DESCRIPTION") {
+			// 描述可能跨多行
+			desc := strings.TrimSpace(strings.TrimPrefix(line, "DESCRIPTION"))
+			currentOID.Description = strings.Trim(desc, "\"")
+		}
+	}
+
+	// 添加最后一个 OID
+	if currentOID.Name != "" {
+		results = append(results, currentOID)
+	}
+
+	return results, nil
+}
+
+// 备用 MIB 解析方法（当 snmptranslate 不可用时）
+func (s *MIBService) parseMIBContentFallback(filePath string) ([]MIBParseResult, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read MIB file: %v", err)
 	}
 
-	// Parse MIB content
-	oids, err := s.parseMIBContent(string(content))
+	var results []MIBParseResult
+	lines := strings.Split(string(content), "\n")
+
+	// 简单的 MIB 解析逻辑
+	oidRegex := regexp.MustCompile(`(\w+)\s+OBJECT\s+IDENTIFIER\s*::=\s*\{\s*([^}]+)\s*\}`)
+	objectRegex := regexp.MustCompile(`(\w+)\s+OBJECT-TYPE`)
+	syntaxRegex := regexp.MustCompile(`SYNTAX\s+(.+)`)
+	accessRegex := regexp.MustCompile(`ACCESS\s+(.+)`)
+	statusRegex := regexp.MustCompile(`STATUS\s+(.+)`)
+	descRegex := regexp.MustCompile(`DESCRIPTION\s+"([^"]*)"`)
+
+	var currentOID MIBParseResult
+	inObjectDef := false
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		
+		// 检查 OBJECT IDENTIFIER 定义
+		if matches := oidRegex.FindStringSubmatch(line); len(matches) > 2 {
+			if currentOID.Name != "" {
+				results = append(results, currentOID)
+			}
+			currentOID = MIBParseResult{
+				Name: matches[1],
+				OID:  s.parseOIDPath(matches[2]),
+			}
+			inObjectDef = false
+		}
+
+		// 检查 OBJECT-TYPE 定义
+		if matches := objectRegex.FindStringSubmatch(line); len(matches) > 1 {
+			if currentOID.Name != "" {
+				results = append(results, currentOID)
+			}
+			currentOID = MIBParseResult{
+				Name: matches[1],
+			}
+			inObjectDef = true
+		}
+
+		if inObjectDef {
+			if matches := syntaxRegex.FindStringSubmatch(line); len(matches) > 1 {
+				currentOID.Type = strings.TrimSpace(matches[1])
+			}
+			if matches := accessRegex.FindStringSubmatch(line); len(matches) > 1 {
+				currentOID.Access = strings.TrimSpace(matches[1])
+			}
+			if matches := statusRegex.FindStringSubmatch(line); len(matches) > 1 {
+				currentOID.Status = strings.TrimSpace(matches[1])
+			}
+			if matches := descRegex.FindStringSubmatch(line); len(matches) > 1 {
+				currentOID.Description = matches[1]
+			}
+		}
+	}
+
+	// 添加最后一个 OID
+	if currentOID.Name != "" {
+		results = append(results, currentOID)
+	}
+
+	return results, nil
+}
+
+// 解析 OID 路径
+func (s *MIBService) parseOIDPath(oidPath string) string {
+	// 简单的 OID 路径解析
+	parts := strings.Fields(oidPath)
+	var oidNumbers []string
+	
+	for _, part := range parts {
+		if num, err := strconv.Atoi(part); err == nil {
+			oidNumbers = append(oidNumbers, strconv.Itoa(num))
+		}
+	}
+	
+	return strings.Join(oidNumbers, ".")
+}
+
+func (s *MIBService) ParseMIB(filePath string) ([]models.OID, error) {
+	// 使用新的解析方法
+	parseResults, err := s.ParseMIBWithSNMPTranslate(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse MIB content: %v", err)
 	}
 
+	// 转换为 models.OID 结构
+	var oids []models.OID
+	for _, result := range parseResults {
+		oid := models.OID{
+			OID:         result.OID,
+			Name:        result.Name,
+			Type:        result.Type,
+			Access:      result.Access,
+			Description: result.Description,
+			Status:      result.Status,
+		}
+		oids = append(oids, oid)
+	}
+
 	return oids, nil
+}
+
+// 上传并解析 MIB 文件
+func (s *MIBService) UploadAndParseMIB(file multipart.File, header *multipart.FileHeader) (*models.MIB, error) {
+	// 创建上传目录
+	uploadDir := "/opt/monitoring/mibs/uploads"
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create upload directory: %v", err)
+	}
+
+	// 保存文件
+	filePath := filepath.Join(uploadDir, header.Filename)
+	dst, err := os.Create(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create file: %v", err)
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, file); err != nil {
+		return nil, fmt.Errorf("failed to save file: %v", err)
+	}
+
+	// 解析 MIB 文件
+	oids, err := s.ParseMIB(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse MIB file: %v", err)
+	}
+
+	// 创建 MIB 记录
+	mib := &models.MIB{
+		Name:        strings.TrimSuffix(header.Filename, filepath.Ext(header.Filename)),
+		Filename:    header.Filename,
+		FilePath:    filePath,
+		Size:        header.Size,
+		Status:      "active",
+		UploadedAt:  time.Now(),
+		OIDs:        oids,
+	}
+
+	// 保存到数据库
+	if err := s.db.Create(mib).Error; err != nil {
+		return nil, fmt.Errorf("failed to save MIB to database: %v", err)
+	}
+
+	return mib, nil
 }
 
 func (s *MIBService) parseMIBContent(content string) ([]models.OID, error) {

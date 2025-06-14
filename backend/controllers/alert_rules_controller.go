@@ -893,6 +893,21 @@ func (c *AlertRulesController) RejectRecommendation(ctx *gin.Context) {
 	utils.SuccessResponse(ctx, "拒绝推荐成功", nil)
 }
 
+// GetDeviceGroupByID 根据ID获取设备组
+func (c *AlertRulesController) GetDeviceGroupByID(ctx *gin.Context) {
+	id := ctx.Param("id")
+	
+	group, err := c.alertRulesService.GetDeviceGroupByID(id)
+	if err != nil {
+		utils.ErrorResponse(ctx, http.StatusInternalServerError, "获取设备组失败", err)
+		return
+	}
+	
+	utils.SuccessResponse(ctx, "获取设备组成功", group)
+}
+
+
+
 // ValidatePromQL 验证PromQL表达式
 // @Summary 验证PromQL表达式
 // @Description 验证PromQL表达式的语法正确性
