@@ -24,7 +24,7 @@
 
 ### 1. 环境变量配置
 
-**文件位置**: [`.env`](file://.env)
+**文件位置**: `` `.env` ``
 
 > 📝 **操作**: 复制 `.env.example` 为 `.env` 并修改以下配置
 
@@ -102,7 +102,7 @@ DB_MAX_IDLE_CONNS=5
 
 ### 2. Docker Compose 配置
 
-**文件位置**: [`docker-compose.yml`](file://docker-compose.yml)
+**文件位置**: `` `docker-compose.yml` ``
 
 #### 🔐 数据库密码（必须修改）
 
@@ -111,11 +111,12 @@ DB_MAX_IDLE_CONNS=5
 environment:
   POSTGRES_DB: network_monitor
   POSTGRES_USER: netmon_user
-  # 修改此密码 - 必须与 .env 文件中的 POSTGRES_PASSWORD 保持一致
+  # 修改此密码 - 建议使用环境变量, e.g., ${POSTGRES_PASSWORD:-your_default_fallback_password}
+  # 必须与 .env 文件中的 POSTGRES_PASSWORD 保持一致
   # 说明：数据库用户的登录密码，建议使用强密码
   # 要求：至少8位，包含大小写字母、数字和特殊字符
-  # 示例：POSTGRES_PASSWORD: "MySecureDB2024!"
-  POSTGRES_PASSWORD: netmon_pass_2024
+  # 示例：POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-MySecureDB2024!}"
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-netmon_pass_2024} # Ensure this aligns with .env
 ```
 
 #### 🔐 Redis 密码（必须修改）
@@ -158,7 +159,7 @@ ports:
 
 ### 3. Nginx 配置
 
-**文件位置**: [`nginx/nginx.conf`](file://nginx/nginx.conf)
+**文件位置**: `` `nginx/nginx.conf` ``
 
 #### 🌐 服务器名称（必须修改）
 
@@ -202,7 +203,7 @@ limit_req_zone $binary_remote_addr zone=login:10m rate=1r/s;   # 可调整登录
 
 ### 4. Redis 配置
 
-**文件位置**: [`redis/redis.conf`](file://redis/redis.conf)
+**文件位置**: `` `redis/redis.conf` ``
 
 #### 💾 内存配置（建议修改）
 
@@ -236,7 +237,7 @@ protected-mode yes
 
 ### 5. 数据库初始化
 
-**文件位置**: [`database/init/01-init.sql`](file://database/init/01-init.sql)
+**文件位置**: `` `database/init/01-init.sql` ``
 
 #### 👤 默认管理员账户（建议修改）
 
@@ -244,12 +245,12 @@ protected-mode yes
 
 ```sql
 -- 插入默认管理员用户
-INSERT INTO users (email, name, password_hash, role, is_active) 
+INSERT INTO users (email, name, password_hash, role, is_active)
 VALUES (
     'admin@yourdomain.com',           -- 修改邮箱
     'System Administrator',            -- 修改名称
-    '$2a$10$...',                     -- 使用 bcrypt 加密的密码
-    'admin', 
+    '$2a$10$...',                     -- TODO: Replace with a valid bcrypt hash for a default password or document password change procedure
+    'admin',
     true
 );
 ```
@@ -313,8 +314,8 @@ docker-compose logs -f
 
 ```bash
 # 检查服务健康状态
-curl http://localhost:8080/health
-curl http://localhost:3000
+curl http://localhost:8080/health # Backend
+curl http://localhost:3000/api/health # Frontend
 
 # 检查数据库连接
 docker-compose exec postgres psql -U netmon_user -d network_monitor -c "\dt"
@@ -362,12 +363,12 @@ docker-compose logs nginx
 
 | 配置类型 | 文件路径 | 主要用途 |
 |---------|----------|----------|
-| 环境变量 | [`.env`](file://.env) | 应用程序配置 |
-| 容器编排 | [`docker-compose.yml`](file://docker-compose.yml) | 服务定义和网络 |
-| 反向代理 | [`nginx/nginx.conf`](file://nginx/nginx.conf) | 负载均衡和SSL |
-| 缓存配置 | [`redis/redis.conf`](file://redis/redis.conf) | Redis 性能调优 |
-| 数据库初始化 | [`database/init/01-init.sql`](file://database/init/01-init.sql) | 数据库结构 |
-| 应用构建 | [`Dockerfile`](file://Dockerfile) | 容器镜像构建 |
+| 环境变量 | `` `.env` `` | 应用程序配置 |
+| 容器编排 | `` `docker-compose.yml` `` | 服务定义和网络 |
+| 反向代理 | `` `nginx/nginx.conf` `` | 负载均衡和SSL |
+| 缓存配置 | `` `redis/redis.conf` `` | Redis 性能调优 |
+| 数据库初始化 | `` `database/init/01-init.sql` `` | 数据库结构 |
+| 应用构建 | `` `Dockerfile` `` | 容器镜像构建 |
 
 ---
 

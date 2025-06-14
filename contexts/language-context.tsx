@@ -4,6 +4,11 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from "
 
 type Language = "en" | "zh"
 
+// Define a type for the translations
+interface Translations {
+  [key: string]: string | Translations
+}
+
 interface LanguageContextType {
   language: Language
   setLanguage: (lang: Language) => void
@@ -12,146 +17,14 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
 
-const translations = {
-  en: {
-    "nav.platform": "Platform",
-    "nav.dashboard": "Dashboard",
-    "nav.monitoring": "Network Monitoring",
-    "nav.devices": "Devices",
-    "nav.topology": "Network Topology",
-    "nav.discovery": "Network Discovery",
-    "nav.services": "Services",
-    "nav.alerts": "Alerts & Events",
-    "nav.alert-management": "Alert Management",
-    "nav.events": "Event Logs",
-    "nav.notifications": "Notifications",
-    "nav.analytics": "Analytics & Intelligence",
-    "nav.ai-analytics": "AI Analytics",
-    "nav.intelligent": "Intelligent Analysis",
-    "nav.performance": "Performance Analytics",
-    "nav.reports": "Reports",
-    "nav.assets": "Asset Management",
-    "nav.it-assets": "IT Assets",
-    "nav.inventory": "Inventory",
-    "nav.lifecycle": "Lifecycle",
-    "nav.capacity": "Capacity Planning",
-    "nav.configuration": "Configuration",
-    "nav.config-gen": "Config Generation",
-    "nav.mibs": "MIB Management",
-    "nav.templates": "Templates",
-    "nav.backup": "Backup & Restore",
-    "nav.automation": "Automation",
-    "nav.workflows": "Workflows",
-    "nav.scripts": "Scripts",
-    "nav.tasks": "Task Scheduler",
-    "nav.security": "Security",
-    "nav.security-dashboard": "Security Dashboard",
-    "nav.vulnerabilities": "Vulnerability Scan",
-    "nav.compliance": "Compliance",
-    "nav.access-control": "Access Control",
-    "nav.mobile": "Mobile & PWA",
-    "nav.mobile-dashboard": "Mobile Dashboard",
-    "nav.app-settings": "App Settings",
-    "nav.offline": "Offline Mode",
-    "nav.management": "Management",
-    "nav.users": "User Management",
-    "nav.api": "API Management",
-    "nav.deployment": "Deployment",
-    "nav.settings": "System Settings",
-    "common.loading": "Loading...",
-    "common.search": "Search",
-    "common.filter": "Filter",
-    "common.export": "Export",
-    "common.refresh": "Refresh",
-    "common.save": "Save",
-    "common.cancel": "Cancel",
-    "common.delete": "Delete",
-    "common.edit": "Edit",
-    "common.view": "View",
-    "common.create": "Create",
-    "common.update": "Update",
-    "common.close": "Close",
-    "common.open": "Open",
-    "dashboard.title": "Network Monitoring Dashboard",
-    "dashboard.overview": "System Overview",
-    "dashboard.devices": "Total Devices",
-    "dashboard.alerts": "Active Alerts",
-    "dashboard.uptime": "Network Uptime",
-    "dashboard.traffic": "Network Traffic",
-    "header.title": "Network Monitor",
-  },
-  zh: {
-    "nav.platform": "平台",
-    "nav.dashboard": "仪表板",
-    "nav.monitoring": "网络监控",
-    "nav.devices": "设备管理",
-    "nav.topology": "网络拓扑",
-    "nav.discovery": "网络发现",
-    "nav.services": "服务管理",
-    "nav.alerts": "告警与事件",
-    "nav.alert-management": "告警管理",
-    "nav.events": "事件日志",
-    "nav.notifications": "通知管理",
-    "nav.analytics": "分析与智能",
-    "nav.ai-analytics": "AI分析",
-    "nav.intelligent": "智能分析",
-    "nav.performance": "性能分析",
-    "nav.reports": "报告管理",
-    "nav.assets": "资产管理",
-    "nav.it-assets": "IT资产",
-    "nav.inventory": "库存管理",
-    "nav.lifecycle": "生命周期",
-    "nav.capacity": "容量规划",
-    "nav.configuration": "配置管理",
-    "nav.config-gen": "配置生成",
-    "nav.mibs": "MIB管理",
-    "nav.templates": "模板管理",
-    "nav.backup": "备份恢复",
-    "nav.automation": "自动化",
-    "nav.workflows": "工作流",
-    "nav.scripts": "脚本管理",
-    "nav.tasks": "任务调度",
-    "nav.security": "安全管理",
-    "nav.security-dashboard": "安全仪表板",
-    "nav.vulnerabilities": "漏洞扫描",
-    "nav.compliance": "合规管理",
-    "nav.access-control": "访问控制",
-    "nav.mobile": "移动端与PWA",
-    "nav.mobile-dashboard": "移动端仪表板",
-    "nav.app-settings": "应用设置",
-    "nav.offline": "离线模式",
-    "nav.management": "系统管理",
-    "nav.users": "用户管理",
-    "nav.api": "API管理",
-    "nav.deployment": "部署管理",
-    "nav.settings": "系统设置",
-    "common.loading": "加载中...",
-    "common.search": "搜索",
-    "common.filter": "筛选",
-    "common.export": "导出",
-    "common.refresh": "刷新",
-    "common.save": "保存",
-    "common.cancel": "取消",
-    "common.delete": "删除",
-    "common.edit": "编辑",
-    "common.view": "查看",
-    "common.create": "创建",
-    "common.update": "更新",
-    "common.close": "关闭",
-    "common.open": "打开",
-    "dashboard.title": "网络监控仪表板",
-    "dashboard.overview": "系统概览",
-    "dashboard.devices": "设备总数",
-    "dashboard.alerts": "活跃告警",
-    "dashboard.uptime": "网络正常运行时间",
-    "dashboard.traffic": "网络流量",
-    "header.title": "网络监控平台",
-  },
-}
+// Removed hardcoded translations
+// const translations = { ... }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>("en")
   const [isInitialized, setIsInitialized] = useState(false)
+  // State for loaded translations
+  const [loadedTranslations, setLoadedTranslations] = useState<{ [key in Language]?: Translations }>({})
 
   useEffect(() => {
     const savedLanguage = localStorage.getItem("language") as Language
@@ -159,6 +32,131 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       setLanguage(savedLanguage)
     }
     setIsInitialized(true)
+
+    // Simulate fetching translations
+    // In a real app, you would fetch these from /locales/en/common.json and /locales/zh/common.json
+    // For this subtask, we'll use the content read previously.
+    const enTranslations = {
+      "navigation": {
+        "dashboard": "Dashboard",
+        "devices": "Devices",
+        "alerts": "Alerts",
+        "topology": "Network Topology",
+        "assets": "Asset Management",
+        "reports": "Analytics & Reports",
+        "automation": "Automation Tools",
+        "apiManagement": "API Management",
+        "settings": "System Settings",
+        "deployment": "Deployment",
+        "userManagement": "User Management",
+        "aiAnalytics": "AI Analytics",
+        "intelligentAnalysis": "Intelligent Analysis"
+      },
+      "actions": {
+        "save": "Save",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "edit": "Edit",
+        "add": "Add",
+        "create": "Create",
+        "update": "Update",
+        "refresh": "Refresh",
+        "export": "Export",
+        "import": "Import",
+        "search": "Search",
+        "filter": "Filter",
+        "reset": "Reset",
+        "submit": "Submit",
+        "close": "Close",
+        "confirm": "Confirm"
+      },
+      "status": {
+        "active": "Active",
+        "inactive": "Inactive",
+        "online": "Online",
+        "offline": "Offline",
+        "pending": "Pending",
+        "completed": "Completed",
+        "failed": "Failed",
+        "success": "Success",
+        "error": "Error",
+        "warning": "Warning",
+        "info": "Info"
+      },
+      "language": {
+        "english": "English",
+        "chinese": "中文",
+        "switchLanguage": "Switch Language"
+      },
+      "loading": "Loading...",
+      "noData": "No data available",
+      "error": "An error occurred",
+      "success": "Operation successful"
+    };
+
+    const zhTranslations = {
+      "navigation": {
+        "dashboard": "仪表板",
+        "devices": "设备管理",
+        "alerts": "告警管理",
+        "topology": "网络拓扑",
+        "assets": "资产管理",
+        "reports": "分析报表",
+        "automation": "自动化工具",
+        "apiManagement": "API管理",
+        "settings": "系统设置",
+        "deployment": "部署管理",
+        "userManagement": "用户管理",
+        "aiAnalytics": "AI分析",
+        "intelligentAnalysis": "智能分析"
+      },
+      "actions": {
+        "save": "保存",
+        "cancel": "取消",
+        "delete": "删除",
+        "edit": "编辑",
+        "add": "添加",
+        "create": "创建",
+        "update": "更新",
+        "refresh": "刷新",
+        "export": "导出",
+        "import": "导入",
+        "search": "搜索",
+        "filter": "筛选",
+        "reset": "重置",
+        "submit": "提交",
+        "close": "关闭",
+        "confirm": "确认"
+      },
+      "status": {
+        "active": "活跃",
+        "inactive": "非活跃",
+        "online": "在线",
+        "offline": "离线",
+        "pending": "待处理",
+        "completed": "已完成",
+        "failed": "失败",
+        "success": "成功",
+        "error": "错误",
+        "warning": "警告",
+        "info": "信息"
+      },
+      "language": {
+        "english": "English",
+        "chinese": "中文",
+        "switchLanguage": "切换语言"
+      },
+      "loading": "加载中...",
+      "noData": "暂无数据",
+      "error": "发生错误",
+      "success": "操作成功"
+    };
+
+    setLoadedTranslations({
+      en: enTranslations as unknown as Translations,
+      zh: zhTranslations as unknown as Translations,
+    });
+
   }, [])
 
   const changeLanguage = (lang: Language) => {
@@ -171,8 +169,32 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }
 
   const t = (key: string): string => {
-    if (!isInitialized) return key
-    return translations[language][key as keyof (typeof translations)[typeof language]] || key
+    if (!isInitialized || !loadedTranslations[language]) {
+      // Fallback if translations are not loaded for the current language
+      console.error(`Translations not loaded for language: ${language}`);
+      return key;
+    }
+
+    const keys = key.split('.');
+    let current: string | Translations | undefined = loadedTranslations[language];
+
+    for (const k of keys) {
+      if (typeof current === 'object' && current !== null && k in current) {
+        current = current[k];
+      } else {
+        // Key not found
+        console.warn(`Translation key not found: ${key} for language: ${language}`);
+        return key;
+      }
+    }
+
+    if (typeof current === 'string') {
+      return current;
+    } else {
+      // This case should ideally not happen if keys always point to strings
+      console.warn(`Translation key did not resolve to a string: ${key} for language: ${language}`);
+      return key;
+    }
   }
 
   return (

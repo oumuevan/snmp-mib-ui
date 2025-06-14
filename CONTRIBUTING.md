@@ -34,11 +34,11 @@
 ```bash
 # Fork 项目到您的 GitHub 账户
 # 然后克隆您的 fork
-git clone https://github.com/YOUR_USERNAME/mibweb-ui.git
-cd mibweb-ui
+git clone https://github.com/YOUR_USERNAME/your-repository-name.git
+cd your-repository-name # Or mibweb-ui if that's the consistent local name
 
 # 添加上游仓库
-git remote add upstream https://github.com/ORIGINAL_OWNER/mibweb-ui.git
+git remote add upstream https://github.com/original-organization/original-repository-name.git
 ```
 
 ### 2. 安装依赖
@@ -53,7 +53,8 @@ yarn install
 
 ```bash
 # 复制环境变量模板
-cp .env.development.example .env.local
+# cp .env.development.example .env.local # .env.development.example does not exist
+cp .env.example .env.local # Copy .env.example to .env.local and modify it for your development setup.
 
 # 编辑 .env.local 文件，配置必要的环境变量
 ```
@@ -433,9 +434,9 @@ export async function GET(request: Request) {
 
 ### 获取帮助
 
-- 📧 邮箱: support@example.com
-- 💬 讨论: [GitHub Discussions](https://github.com/your-org/mibweb-ui/discussions)
-- 🐛 问题: [GitHub Issues](https://github.com/your-org/mibweb-ui/issues)
+- 📧 邮箱: project-support@example.com <!-- Generic placeholder -->
+- 💬 讨论: [GitHub Discussions](https://github.com/your-organization/your-repository-name/discussions) <!-- Adjusted placeholder -->
+- 🐛 问题: [GitHub Issues](https://github.com/your-organization/your-repository-name/issues) <!-- Adjusted placeholder -->
 
 ### 贡献者
 

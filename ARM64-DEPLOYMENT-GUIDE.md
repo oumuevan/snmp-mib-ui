@@ -119,7 +119,7 @@ services:
 ```bash
 # 1. 下载项目
 git clone <your-repo-url>
-cd web-ui
+cd mib-web-ui
 
 # 2. 运行 ARM64 优化部署
 bash deploy-china.sh

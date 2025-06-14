@@ -1,6 +1,8 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { useLanguage } from '@/contexts/language-context'
+import { COMPONENT_CONFIGS } from '../components/ComponentDetails' // Added
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -103,6 +105,21 @@ interface SystemOverview {
   uptime: string
 }
 
+// Define types for MonitoringComponent and ComponentVersion if not already globally available
+// For this scope, assuming they are implicitly available or defined in COMPONENT_CONFIGS import
+interface MonitoringComponentConfig {
+  id: string;
+  name: string;
+  category: 'collector' | 'storage' | 'visualization' | 'alerting';
+  versions: { version: string }[];
+  // Add other fields from COMPONENT_CONFIGS if needed by generateInitialComponentMetrics
+}
+
+interface AllComponentConfigs {
+  [key: string]: MonitoringComponentConfig;
+}
+
+
 interface AlertItem {
   id: string
   severity: 'critical' | 'warning' | 'info'
@@ -126,165 +143,123 @@ const generateTimeSeriesData = (points: number, baseValue: number, variance: num
   return data
 }
 
-// 模拟数据
-const MOCK_SYSTEM_OVERVIEW: SystemOverview = {
-  totalComponents: 8,
-  healthyComponents: 6,
-  warningComponents: 1,
-  criticalComponents: 1,
-  totalAlerts: 12,
-  activeIncidents: 2,
-  dataIngestionRate: 15420,
-  queryRate: 3240,
-  storageUsed: 245,
-  storageTotal: 500,
-  networkTraffic: 1250,
-  uptime: '15d 8h 32m'
-}
+// Helper function to generate initial component metrics
+const generateInitialComponentMetrics = (
+  configs: AllComponentConfigs,
+  existingMocks: ComponentMetrics[]
+): ComponentMetrics[] => {
+  const allMetrics: ComponentMetrics[] = [];
+  const existingMockMap = new Map(existingMocks.map(m => [m.id, m]));
 
-const MOCK_COMPONENT_METRICS: ComponentMetrics[] = [
+  Object.keys(configs).forEach(id => {
+    const config = configs[id];
+    if (existingMockMap.has(id)) {
+      // Use existing mock if available
+      allMetrics.push(existingMockMap.get(id)!);
+    } else {
+      // Create new default metric structure
+      allMetrics.push({
+        id: config.id,
+        name: config.name,
+        category: config.category,
+        status: 'unknown', // Default status
+        uptime: '0d 0h 0m', // Default uptime
+        version: config.versions[0]?.version || 'N/A', // Default to latest version
+        metrics: {
+          cpu: { current: 0, average: 0, trend: 'stable', history: generateTimeSeriesData(30, 0, 5) },
+          memory: { current: 0, average: 0, trend: 'stable', history: generateTimeSeriesData(30, 0, 5) },
+          requests: { current: 0, total: 0, trend: 'stable', history: generateTimeSeriesData(30, 0, 50) },
+          errors: { current: 0, rate: 0, trend: 'stable', history: generateTimeSeriesData(30, 0, 1) },
+        },
+        alerts: { critical: 0, warning: 0, info: 0 },
+      });
+    }
+  });
+  return allMetrics;
+};
+
+
+// Initial system overview - some parts will be dynamic
+const INITIAL_SYSTEM_OVERVIEW: SystemOverview = {
+  totalComponents: Object.keys(COMPONENT_CONFIGS).length,
+  healthyComponents: 0, // Will be calculated
+  warningComponents: 0, // Will be calculated
+  criticalComponents: 0, // Will be calculated
+  totalAlerts: 0, // Can be summed from components or be a separate mock value
+  activeIncidents: 0, // Mock or derived
+  dataIngestionRate: 12345, // Mock value
+  queryRate: 2870, // Mock value
+  storageUsed: 210, // Mock value
+  storageTotal: 500, // Mock value
+  networkTraffic: 1150, // Mock value
+  uptime: '0d 0h 0m' // Initial uptime, can be updated
+};
+
+// Original MOCK_COMPONENT_METRICS for the first 4 components (can be used by generateInitialComponentMetrics)
+const ORIGINAL_MOCK_COMPONENT_METRICS: ComponentMetrics[] = [
   {
-    id: 'node-exporter',
-    name: 'Node Exporter',
-    category: 'collector',
+    id: 'node-exporter', // This ID must match a key in COMPONENT_CONFIGS
+    name: 'Node Exporter', // This will be overridden by COMPONENT_CONFIGS if logic is set up that way
+    category: 'collector', // Will be overridden
     status: 'healthy',
-    uptime: '15d 8h 32m',
-    version: '1.7.0',
-    metrics: {
-      cpu: {
-        current: 12,
-        average: 15,
-        trend: 'down',
-        history: generateTimeSeriesData(30, 15, 10)
-      },
-      memory: {
-        current: 45,
-        average: 42,
-        trend: 'up',
-        history: generateTimeSeriesData(30, 42, 15)
-      },
-      requests: {
-        current: 1250,
-        total: 1847520,
-        trend: 'stable',
-        history: generateTimeSeriesData(30, 1200, 200)
-      },
-      errors: {
-        current: 0,
-        rate: 0.02,
-        trend: 'stable',
-        history: generateTimeSeriesData(30, 0, 1)
-      }
+    uptime: '15d 8h 32m', // Example uptime
+    version: '1.7.0', // Will be overridden by latest from COMPONENT_CONFIGS
+    metrics: { /* ... existing detailed metrics ... */
+      cpu: { current: 12, average: 15, trend: 'down', history: generateTimeSeriesData(30, 15, 10) },
+      memory: { current: 45, average: 42, trend: 'up', history: generateTimeSeriesData(30, 42, 15) },
+      requests: { current: 1250, total: 1847520, trend: 'stable', history: generateTimeSeriesData(30, 1200, 200) },
+      errors: { current: 0, rate: 0.02, trend: 'stable', history: generateTimeSeriesData(30, 0, 1) }
     },
     alerts: { critical: 0, warning: 1, info: 2 }
   },
   {
-    id: 'victoriametrics',
-    name: 'VictoriaMetrics',
-    category: 'storage',
+    id: 'victoriametrics', // Must match a key in COMPONENT_CONFIGS
+    name: 'VictoriaMetrics', // Override
+    category: 'storage', // Override
     status: 'healthy',
-    uptime: '15d 8h 30m',
-    version: '1.96.0',
-    metrics: {
-      cpu: {
-        current: 35,
-        average: 32,
-        trend: 'up',
-        history: generateTimeSeriesData(30, 32, 12)
-      },
-      memory: {
-        current: 68,
-        average: 65,
-        trend: 'stable',
-        history: generateTimeSeriesData(30, 65, 8)
-      },
-      requests: {
-        current: 3420,
-        total: 5234890,
-        trend: 'up',
-        history: generateTimeSeriesData(30, 3200, 500)
-      },
-      errors: {
-        current: 2,
-        rate: 0.06,
-        trend: 'stable',
-        history: generateTimeSeriesData(30, 2, 3)
-      }
+    uptime: '15d 8h 30m', // Example
+    version: '1.96.0', // Override
+    metrics: { /* ... existing detailed metrics ... */
+      cpu: { current: 35, average: 32, trend: 'up', history: generateTimeSeriesData(30, 32, 12) },
+      memory: { current: 68, average: 65, trend: 'stable', history: generateTimeSeriesData(30, 65, 8) },
+      requests: { current: 3420, total: 5234890, trend: 'up', history: generateTimeSeriesData(30, 3200, 500) },
+      errors: { current: 2, rate: 0.06, trend: 'stable', history: generateTimeSeriesData(30, 2, 3) }
     },
     alerts: { critical: 0, warning: 0, info: 1 }
   },
   {
-    id: 'grafana',
-    name: 'Grafana',
-    category: 'visualization',
+    id: 'grafana', // Must match a key in COMPONENT_CONFIGS
+    name: 'Grafana', // Override
+    category: 'visualization', // Override
     status: 'warning',
-    uptime: '2d 4h 15m',
-    version: '10.2.3',
-    metrics: {
-      cpu: {
-        current: 25,
-        average: 22,
-        trend: 'up',
-        history: generateTimeSeriesData(30, 22, 8)
-      },
-      memory: {
-        current: 85,
-        average: 78,
-        trend: 'up',
-        history: generateTimeSeriesData(30, 78, 12)
-      },
-      requests: {
-        current: 890,
-        total: 234560,
-        trend: 'stable',
-        history: generateTimeSeriesData(30, 850, 150)
-      },
-      errors: {
-        current: 5,
-        rate: 0.56,
-        trend: 'up',
-        history: generateTimeSeriesData(30, 3, 4)
-      }
+    uptime: '2d 4h 15m', // Example
+    version: '10.2.3', // Override
+    metrics: { /* ... existing detailed metrics ... */
+      cpu: { current: 25, average: 22, trend: 'up', history: generateTimeSeriesData(30, 22, 8) },
+      memory: { current: 85, average: 78, trend: 'up', history: generateTimeSeriesData(30, 78, 12) },
+      requests: { current: 890, total: 234560, trend: 'stable', history: generateTimeSeriesData(30, 850, 150) },
+      errors: { current: 5, rate: 0.56, trend: 'up', history: generateTimeSeriesData(30, 3, 4) }
     },
     alerts: { critical: 0, warning: 2, info: 1 }
   },
   {
-    id: 'alertmanager',
-    name: 'Alertmanager',
-    category: 'alerting',
+    id: 'alertmanager', // Must match a key in COMPONENT_CONFIGS
+    name: 'Alertmanager', // Override
+    category: 'alerting', // Override
     status: 'critical',
-    uptime: '0h 0m',
-    version: '0.26.0',
-    metrics: {
-      cpu: {
-        current: 0,
-        average: 8,
-        trend: 'down',
-        history: generateTimeSeriesData(30, 8, 5)
-      },
-      memory: {
-        current: 0,
-        average: 25,
-        trend: 'down',
-        history: generateTimeSeriesData(30, 25, 10)
-      },
-      requests: {
-        current: 0,
-        total: 45230,
-        trend: 'down',
-        history: generateTimeSeriesData(30, 120, 50)
-      },
-      errors: {
-        current: 15,
-        rate: 100,
-        trend: 'up',
-        history: generateTimeSeriesData(30, 5, 8)
-      }
+    uptime: '0h 0m', // Example
+    version: '0.26.0', // Override
+    metrics: { /* ... existing detailed metrics ... */
+      cpu: { current: 0, average: 8, trend: 'down', history: generateTimeSeriesData(30, 8, 5) },
+      memory: { current: 0, average: 25, trend: 'down', history: generateTimeSeriesData(30, 25, 10) },
+      requests: { current: 0, total: 45230, trend: 'down', history: generateTimeSeriesData(30, 120, 50) },
+      errors: { current: 15, rate: 100, trend: 'up', history: generateTimeSeriesData(30, 5, 8) }
     },
     alerts: { critical: 3, warning: 1, info: 0 }
   }
-]
+];
 
+// This MOCK_ALERTS array can remain as is, or be dynamically generated if needed
 const MOCK_ALERTS: AlertItem[] = [
   {
     id: 'alert-1',
@@ -328,12 +303,12 @@ const MOCK_ALERTS: AlertItem[] = [
   }
 ]
 
-const StatusBadge = ({ status }: { status: string }) => {
-  const statusConfig: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
-    healthy: { color: 'bg-green-100 text-green-800', icon: <CheckCircle className="h-3 w-3" />, label: '健康' },
-    warning: { color: 'bg-yellow-100 text-yellow-800', icon: <AlertTriangle className="h-3 w-3" />, label: '警告' },
-    critical: { color: 'bg-red-100 text-red-800', icon: <XCircle className="h-3 w-3" />, label: '严重' },
-    unknown: { color: 'bg-gray-100 text-gray-800', icon: <Clock className="h-3 w-3" />, label: '未知' }
+const StatusBadge = ({ status, t }: { status: string; t: (key: string) => string }) => {
+  const statusConfig: Record<string, { color: string; icon: React.ReactNode; labelKey: string }> = {
+    healthy: { color: 'bg-green-100 text-green-800', icon: <CheckCircle className="h-3 w-3" />, labelKey: 'status.healthy' },
+    warning: { color: 'bg-yellow-100 text-yellow-800', icon: <AlertTriangle className="h-3 w-3" />, labelKey: 'status.warning' },
+    critical: { color: 'bg-red-100 text-red-800', icon: <XCircle className="h-3 w-3" />, labelKey: 'status.critical' },
+    unknown: { color: 'bg-gray-100 text-gray-800', icon: <Clock className="h-3 w-3" />, labelKey: 'status.unknown' }
   }
 
   const config = statusConfig[status] || statusConfig.unknown
@@ -341,7 +316,7 @@ const StatusBadge = ({ status }: { status: string }) => {
   return (
     <Badge className={`${config.color} flex items-center gap-1`}>
       {config.icon}
-      {config.label}
+      {t(config.labelKey)}
     </Badge>
   )
 }
@@ -445,8 +420,31 @@ const MiniChart = ({ data, color = 'blue' }: { data: MetricData[]; color?: strin
 }
 
 export default function MonitoringDashboard() {
-  const [systemOverview, setSystemOverview] = useState<SystemOverview>(MOCK_SYSTEM_OVERVIEW)
-  const [componentMetrics, setComponentMetrics] = useState<ComponentMetrics[]>(MOCK_COMPONENT_METRICS)
+  const { t } = useLanguage()
+  const [componentMetrics, setComponentMetrics] = useState<ComponentMetrics[]>(
+    generateInitialComponentMetrics(COMPONENT_CONFIGS as AllComponentConfigs, ORIGINAL_MOCK_COMPONENT_METRICS)
+  );
+  const [systemOverview, setSystemOverview] = useState<SystemOverview>(() => {
+    const initialMetrics = generateInitialComponentMetrics(COMPONENT_CONFIGS as AllComponentConfigs, ORIGINAL_MOCK_COMPONENT_METRICS);
+    let healthy = 0;
+    let warning = 0;
+    let critical = 0;
+    initialMetrics.forEach(c => {
+      if (c.status === 'healthy') healthy++;
+      else if (c.status === 'warning') warning++;
+      else if (c.status === 'critical') critical++;
+    });
+    // For unknown, if they are not counted in healthy/warning/critical, totalComponents will cover them.
+    // Or adjust logic to specifically count unknown and subtract from healthy if needed.
+    return {
+      ...INITIAL_SYSTEM_OVERVIEW,
+      healthyComponents: healthy,
+      warningComponents: warning,
+      criticalComponents: critical,
+      // If a component is 'unknown', it won't be in healthy, warning, or critical.
+      // totalComponents is already set to Object.keys(COMPONENT_CONFIGS).length.
+    };
+  });
   const [alerts, setAlerts] = useState<AlertItem[]>(MOCK_ALERTS)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [refreshInterval, setRefreshInterval] = useState('30')
@@ -505,8 +503,8 @@ export default function MonitoringDashboard() {
       {/* 页面标题 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">监控仪表板</h1>
-          <p className="text-gray-600 mt-1">监控组件整体状态和关键指标</p>
+          <h1 className="text-3xl font-bold">{t('monitoringDashboard.header.title')}</h1>
+          <p className="text-gray-600 mt-1">{t('monitoringDashboard.header.subtitle')}</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center space-x-2">
@@ -515,22 +513,22 @@ export default function MonitoringDashboard() {
               checked={autoRefresh}
               onCheckedChange={setAutoRefresh}
             />
-            <Label htmlFor="auto-refresh" className="text-sm">自动刷新</Label>
+            <Label htmlFor="auto-refresh" className="text-sm">{t('monitoringDashboard.controls.autoRefreshLabel')}</Label>
           </div>
           <Select value={refreshInterval} onValueChange={setRefreshInterval}>
             <SelectTrigger className="w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="10">10秒</SelectItem>
-              <SelectItem value="30">30秒</SelectItem>
-              <SelectItem value="60">1分钟</SelectItem>
-              <SelectItem value="300">5分钟</SelectItem>
+              <SelectItem value="10">{t('monitoringDashboard.controls.interval.seconds10')}</SelectItem>
+              <SelectItem value="30">{t('monitoringDashboard.controls.interval.seconds30')}</SelectItem>
+              <SelectItem value="60">{t('monitoringDashboard.controls.interval.minute1')}</SelectItem>
+              <SelectItem value="300">{t('monitoringDashboard.controls.interval.minutes5')}</SelectItem>
             </SelectContent>
           </Select>
           <Button variant="outline" size="sm">
             <RefreshCw className="h-4 w-4 mr-2" />
-            刷新
+            {t('actions.refresh')}
           </Button>
         </div>
       </div>
@@ -538,32 +536,32 @@ export default function MonitoringDashboard() {
       {/* 系统概览 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          title="系统健康度"
+          title={t('monitoringDashboard.overview.systemHealth.title')}
           value={getHealthyPercentage()}
           unit="%"
           icon={<Shield className="h-5 w-5" />}
           color="bg-green-100 text-green-600"
-          subtitle={`${systemOverview.healthyComponents}/${systemOverview.totalComponents} 组件健康`}
+          subtitle={`${systemOverview.healthyComponents}/${systemOverview.totalComponents} ${t('monitoringDashboard.overview.systemHealth.componentsHealthy')}`}
         />
         <MetricCard
-          title="活跃告警"
+          title={t('monitoringDashboard.overview.activeAlerts.title')}
           value={getActiveAlerts().length}
           icon={<Bell className="h-5 w-5" />}
           color="bg-red-100 text-red-600"
-          subtitle={`共 ${systemOverview.totalAlerts} 条告警`}
+          subtitle={t('monitoringDashboard.overview.activeAlerts.totalAlerts', { count: systemOverview.totalAlerts })}
         />
         <MetricCard
-          title="数据摄入率"
+          title={t('monitoringDashboard.overview.dataIngestionRate.title')}
           value={systemOverview.dataIngestionRate}
-          unit="/min"
+          unit={t('units.perMinute')}
           icon={<Zap className="h-5 w-5" />}
           color="bg-blue-100 text-blue-600"
           trend="up"
         />
         <MetricCard
-          title="查询率"
+          title={t('monitoringDashboard.overview.queryRate.title')}
           value={systemOverview.queryRate}
-          unit="/min"
+          unit={t('units.perMinute')}
           icon={<Target className="h-5 w-5" />}
           color="bg-purple-100 text-purple-600"
           trend="stable"
@@ -577,7 +575,7 @@ export default function MonitoringDashboard() {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <HardDrive className="h-5 w-5 text-orange-600" />
-                <span className="font-medium">存储使用</span>
+                <span className="font-medium">{t('monitoringDashboard.storage.title')}</span>
               </div>
               <span className="text-sm text-gray-600">{getStoragePercentage()}%</span>
             </div>
@@ -588,15 +586,15 @@ export default function MonitoringDashboard() {
           </CardContent>
         </Card>
         <MetricCard
-          title="网络流量"
+          title={t('monitoringDashboard.network.traffic.title')}
           value={systemOverview.networkTraffic}
-          unit="MB/s"
+          unit={t('units.megabytesPerSecond')}
           icon={<Wifi className="h-5 w-5" />}
           color="bg-cyan-100 text-cyan-600"
           trend="up"
         />
         <MetricCard
-          title="系统运行时间"
+          title={t('monitoringDashboard.overview.systemUptime.title')}
           value={systemOverview.uptime}
           icon={<Clock className="h-5 w-5" />}
           color="bg-emerald-100 text-emerald-600"
@@ -608,9 +606,9 @@ export default function MonitoringDashboard() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Container className="h-5 w-5" />
-            组件状态
+            {t('monitoringDashboard.componentStatus.header.title')}
           </CardTitle>
-          <CardDescription>监控组件的实时状态和关键指标</CardDescription>
+          <CardDescription>{t('monitoringDashboard.componentStatus.header.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -620,19 +618,19 @@ export default function MonitoringDashboard() {
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <CategoryIcon category={component.category} />
-                      <h3 className="font-medium">{component.name}</h3>
+                      <h3 className="font-medium">{component.name}</h3> {/* Component name might also need translation if it's not a proper noun */}
                       <Badge variant="outline" className="text-xs">
                         v{component.version}
                       </Badge>
                     </div>
-                    <StatusBadge status={component.status} />
+                    <StatusBadge status={component.status} t={t} />
                   </div>
                   
                   <div className="grid grid-cols-2 gap-3 mb-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Cpu className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm">CPU</span>
+                        <span className="text-sm">{t('metrics.cpu')}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="text-sm font-medium">{Math.round(component.metrics.cpu.current)}%</span>
@@ -642,7 +640,7 @@ export default function MonitoringDashboard() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <MemoryStick className="h-4 w-4 text-green-600" />
-                        <span className="text-sm">内存</span>
+                        <span className="text-sm">{t('metrics.memory')}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="text-sm font-medium">{Math.round(component.metrics.memory.current)}%</span>
@@ -652,7 +650,7 @@ export default function MonitoringDashboard() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Zap className="h-4 w-4 text-purple-600" />
-                        <span className="text-sm">请求</span>
+                        <span className="text-sm">{t('metrics.requests')}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="text-sm font-medium">{component.metrics.requests.current}</span>
@@ -662,7 +660,7 @@ export default function MonitoringDashboard() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <XCircle className="h-4 w-4 text-red-600" />
-                        <span className="text-sm">错误</span>
+                        <span className="text-sm">{t('metrics.errors')}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="text-sm font-medium">{component.metrics.errors.current}</span>
@@ -672,9 +670,9 @@ export default function MonitoringDashboard() {
                   </div>
                   
                   <div className="flex items-center justify-between text-xs text-gray-600">
-                    <span>运行时间: {component.uptime}</span>
+                    <span>{t('monitoringDashboard.componentStatus.card.uptimeLabel')} {component.uptime}</span>
                     <div className="flex items-center gap-1">
-                      <span>告警:</span>
+                      <span>{t('monitoringDashboard.componentStatus.card.alertsLabel')}</span>
                       {component.alerts.critical > 0 && (
                         <Badge className="bg-red-100 text-red-800 text-xs px-1">
                           {component.alerts.critical}
@@ -705,9 +703,9 @@ export default function MonitoringDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
-              活跃告警
+              {t('monitoringDashboard.activeAlerts.header.title')}
             </CardTitle>
-            <CardDescription>需要关注的告警信息</CardDescription>
+            <CardDescription>{t('monitoringDashboard.activeAlerts.header.description')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -715,9 +713,9 @@ export default function MonitoringDashboard() {
                 <div key={alert.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                   <AlertBadge severity={alert.severity} />
                   <div className="flex-1">
-                    <p className="text-sm font-medium">{alert.message}</p>
+                    <p className="text-sm font-medium">{alert.message}</p> {/* Alert message might need translation depending on source */}
                     <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
-                      <span>{alert.component}</span>
+                      <span>{alert.component}</span> {/* Component name might also need translation */}
                       <span>•</span>
                       <span>{alert.timestamp}</span>
                     </div>
@@ -727,7 +725,7 @@ export default function MonitoringDashboard() {
               {getActiveAlerts().length === 0 && (
                 <div className="text-center py-6 text-gray-500">
                   <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
-                  <p>没有活跃告警</p>
+                  <p>{t('monitoringDashboard.activeAlerts.noAlerts')}</p>
                 </div>
               )}
             </div>
@@ -738,40 +736,40 @@ export default function MonitoringDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="h-5 w-5" />
-              性能趋势
+              {t('monitoringDashboard.performanceTrends.header.title')}
             </CardTitle>
-            <CardDescription>关键指标的变化趋势</CardDescription>
+            <CardDescription>{t('monitoringDashboard.performanceTrends.header.description')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">CPU 使用率</p>
-                  <p className="text-xs text-gray-600">平均: 23%</p>
+                  <p className="text-sm font-medium">{t('monitoringDashboard.performanceTrends.cpuUsage.title')}</p>
+                  <p className="text-xs text-gray-600">{t('monitoringDashboard.performanceTrends.averageLabel', { value: '23%' })}</p> {/* Value is dynamic */}
                 </div>
                 <MiniChart data={componentMetrics[0]?.metrics.cpu.history || []} color="blue" />
               </div>
               <Separator />
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">内存使用率</p>
-                  <p className="text-xs text-gray-600">平均: 56%</p>
+                  <p className="text-sm font-medium">{t('monitoringDashboard.performanceTrends.memoryUsage.title')}</p>
+                  <p className="text-xs text-gray-600">{t('monitoringDashboard.performanceTrends.averageLabel', { value: '56%' })}</p> {/* Value is dynamic */}
                 </div>
                 <MiniChart data={componentMetrics[0]?.metrics.memory.history || []} color="green" />
               </div>
               <Separator />
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">请求数量</p>
-                  <p className="text-xs text-gray-600">平均: 2.1k/min</p>
+                  <p className="text-sm font-medium">{t('monitoringDashboard.performanceTrends.requestCount.title')}</p>
+                  <p className="text-xs text-gray-600">{t('monitoringDashboard.performanceTrends.averageLabel', { value: '2.1k/min' })}</p> {/* Value is dynamic */}
                 </div>
                 <MiniChart data={componentMetrics[0]?.metrics.requests.history || []} color="purple" />
               </div>
               <Separator />
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">错误率</p>
-                  <p className="text-xs text-gray-600">平均: 0.15%</p>
+                  <p className="text-sm font-medium">{t('monitoringDashboard.performanceTrends.errorRate.title')}</p>
+                  <p className="text-xs text-gray-600">{t('monitoringDashboard.performanceTrends.averageLabel', { value: '0.15%' })}</p> {/* Value is dynamic */}
                 </div>
                 <MiniChart data={componentMetrics[0]?.metrics.errors.history || []} color="red" />
               </div>
@@ -783,26 +781,26 @@ export default function MonitoringDashboard() {
       {/* 快速操作 */}
       <Card>
         <CardHeader>
-          <CardTitle>快速操作</CardTitle>
-          <CardDescription>常用的管理操作</CardDescription>
+          <CardTitle>{t('monitoringDashboard.quickActions.header.title')}</CardTitle>
+          <CardDescription>{t('monitoringDashboard.quickActions.header.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Button variant="outline" className="h-20 flex-col gap-2">
               <Settings className="h-6 w-6" />
-              <span>配置管理</span>
+              <span>{t('monitoringDashboard.quickActions.buttons.configManagement')}</span>
             </Button>
             <Button variant="outline" className="h-20 flex-col gap-2">
               <Monitor className="h-6 w-6" />
-              <span>部署管理</span>
+              <span>{t('monitoringDashboard.quickActions.buttons.deploymentManagement')}</span>
             </Button>
             <Button variant="outline" className="h-20 flex-col gap-2">
               <Eye className="h-6 w-6" />
-              <span>日志查看</span>
+              <span>{t('monitoringDashboard.quickActions.buttons.logViewing')}</span>
             </Button>
             <Button variant="outline" className="h-20 flex-col gap-2">
               <ExternalLink className="h-6 w-6" />
-              <span>外部链接</span>
+              <span>{t('monitoringDashboard.quickActions.buttons.externalLinks')}</span>
             </Button>
           </div>
         </CardContent>
