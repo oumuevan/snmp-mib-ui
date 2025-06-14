@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -42,6 +44,127 @@ func (c *ConfigController) GetConfigs(ctx *gin.Context) {
 		"total": total,
 		"page":  page,
 		"limit": limit,
+	})
+}
+
+// 生成配置
+func (c *ConfigController) GenerateConfig(ctx *gin.Context) {
+	var req services.ConfigGenerationRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 验证必需字段
+	if req.ConfigType == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "config_type is required"})
+		return
+	}
+	if req.ConfigName == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "config_name is required"})
+		return
+	}
+	if len(req.SelectedOIDs) == 0 {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "selected_oids is required"})
+		return
+	}
+
+	config, err := c.service.GenerateConfig(req)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, gin.H{
+		"message": "Configuration generated successfully",
+		"data":    config,
+	})
+}
+
+// 保存配置到文件
+func (c *ConfigController) SaveConfigToFile(ctx *gin.Context) {
+	var request struct {
+		ConfigID   uint   `json:"config_id" binding:"required"`
+		TargetPath string `json:"target_path" binding:"required"`
+	}
+
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 获取配置
+	config, err := c.service.GetConfig(request.ConfigID)
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Configuration not found"})
+		return
+	}
+
+	// 保存到文件
+	if err := c.service.SaveConfigToFile(config, request.TargetPath); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message":     "Configuration saved to file successfully",
+		"target_path": request.TargetPath,
+	})
+}
+
+// 合并配置到现有文件
+func (c *ConfigController) MergeConfigToFile(ctx *gin.Context) {
+	var request struct {
+		ConfigID   uint   `json:"config_id" binding:"required"`
+		TargetPath string `json:"target_path" binding:"required"`
+	}
+
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 获取配置
+	config, err := c.service.GetConfig(request.ConfigID)
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Configuration not found"})
+		return
+	}
+
+	// 合并到文件
+	if err := c.service.MergeConfigToFile(config, request.TargetPath); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message":     "Configuration merged to file successfully",
+		"target_path": request.TargetPath,
+	})
+}
+
+// 预览配置文件内容
+func (c *ConfigController) PreviewConfigFile(ctx *gin.Context) {
+	filePath := ctx.Query("file_path")
+	if filePath == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "file_path parameter is required"})
+		return
+	}
+
+	// 读取文件内容
+	content, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+		} else {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read file"})
+		}
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"file_path": filePath,
+		"content":   string(content),
 	})
 }
 
@@ -113,28 +236,7 @@ func (c *ConfigController) DeleteConfig(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"message": "Config deleted successfully"})
 }
 
-func (c *ConfigController) GenerateConfig(ctx *gin.Context) {
-	var req struct {
-		Type       string                 `json:"type" binding:"required"`
-		DeviceID   *uint                  `json:"device_id"`
-		TemplateID *uint                  `json:"template_id"`
-		OIDs       []string               `json:"oids"`
-		Options    map[string]interface{} `json:"options"`
-	}
 
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	config, err := c.service.GenerateConfig(req.Type, req.DeviceID, req.TemplateID, req.OIDs, req.Options)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, gin.H{"data": config})
-}
 
 func (c *ConfigController) ValidateConfig(ctx *gin.Context) {
 	var req struct {

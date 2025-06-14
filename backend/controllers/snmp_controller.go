@@ -25,6 +25,22 @@ func NewSNMPController(db *gorm.DB, redis *redis.Client) *SNMPController {
 	}
 }
 
+func (c *SNMPController) GetSNMPConfig(ctx *gin.Context) {
+	config := map[string]interface{}{
+		"status": "active",
+		"version": "v1.0.0",
+		"supported_versions": []string{"1", "2c", "3"},
+		"default_timeout": 5,
+		"default_retries": 3,
+	}
+	
+	ctx.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "SNMP configuration retrieved successfully",
+		"data":    config,
+	})
+}
+
 func (c *SNMPController) SNMPGet(ctx *gin.Context) {
 	var req models.SNMPRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {

@@ -67,6 +67,7 @@ func main() {
 	logger := utils.NewLogger()
 
 	// Initialize services
+	deviceService := services.NewDeviceService(db, redis)
 	prometheusService := services.NewPrometheusService(cfg.PrometheusURL, logger)
 	alertRulesService := services.NewAlertRulesService(db, prometheusService, logger)
 
@@ -75,7 +76,9 @@ func main() {
 	snmpController := controllers.NewSNMPController(db, redis)
 	configController := controllers.NewConfigController(db, redis)
 	deviceController := controllers.NewDeviceController(db, redis)
-	alertRulesController := controllers.NewAlertRulesController(alertRulesService, logger)
+	alertRulesController := controllers.NewAlertRulesController(alertRulesService, deviceService, prometheusService)
+
+
 
 	// API routes
 	api := router.Group("/api/v1")
@@ -94,11 +97,15 @@ func main() {
 			mibs.GET("/:id/oids", mibController.GetMIBOIDs)
 			mibs.POST("/import", mibController.ImportMIBs)
 			mibs.GET("/export", mibController.ExportMIBs)
+			// 新增的 API 端点
+			mibs.GET("/scan", mibController.ScanMIBDirectory)
+			mibs.POST("/parse-file", mibController.ParseMIBFile)
 		}
 
 		// SNMP routes
 		snmp := api.Group("/snmp")
 		{
+			snmp.GET("", snmpController.GetSNMPConfig)
 			snmp.POST("/get", snmpController.SNMPGet)
 			snmp.POST("/walk", snmpController.SNMPWalk)
 			snmp.POST("/set", snmpController.SNMPSet)
@@ -120,6 +127,10 @@ func main() {
 			configs.POST("/templates", configController.CreateTemplate)
 			configs.GET("/:id/versions", configController.GetConfigVersions)
 			configs.POST("/diff", configController.CompareConfigs)
+			// 新增的 API 端点
+			configs.POST("/save-to-file", configController.SaveConfigToFile)
+			configs.POST("/merge-to-file", configController.MergeConfigToFile)
+			configs.GET("/preview-file", configController.PreviewConfigFile)
 		}
 
 		// Device routes
