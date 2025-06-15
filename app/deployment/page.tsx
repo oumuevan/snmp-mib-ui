@@ -1,453 +1,714 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { CheckCircle, Circle, Play, Settings, Database, Activity, Shield } from "lucide-react"
+import React, { useState, useEffect } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Progress } from '@/components/ui/progress'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { 
+  Server, 
+  Settings, 
+  Play, 
+  CheckCircle, 
+  AlertCircle, 
+  Database, 
+  BarChart3, 
+  Monitor,
+  Activity,
+  RefreshCw,
+  Bell,
+  Network,
+  Square,
+  CheckSquare,
+  Upload,
+  Download,
+  Eye,
+  Send
+} from 'lucide-react'
+
+interface Host {
+  id: number
+  name: string
+  ip: string
+  status: 'online' | 'offline' | 'unknown'
+  os: string
+  arch: string
+  cpu_cores: number
+  memory: number
+  disk: number
+}
+
+interface Component {
+  name: string
+  display_name: string
+  type: string
+  version: string
+  description: string
+  default_port: number
+}
+
+interface DeploymentTask {
+  id: string
+  name: string
+  host_id: number
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  progress: number
+  started_at?: string
+  completed_at?: string
+  logs: string[]
+  error?: string
+}
+
+interface ConfigDeploymentTask {
+  id: string
+  name: string
+  host_ids: number[]
+  config_type: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  progress: number
+  results: Array<{
+    host_id: number
+    host_ip: string
+    status: 'success' | 'failed'
+    message: string
+    file_path: string
+  }>
+}
 
 export default function DeploymentPage() {
-  const [currentStep, setCurrentStep] = useState(0)
-  const [deploymentMode, setDeploymentMode] = useState("")
-  const [vmMode, setVmMode] = useState("")
-  const [isDeploying, setIsDeploying] = useState(false)
-  const [deploymentProgress, setDeploymentProgress] = useState(0)
+  const [hosts, setHosts] = useState<Host[]>([])
+  const [components, setComponents] = useState<Component[]>([])
+  const [selectedHosts, setSelectedHosts] = useState<number[]>([])
+  const [selectedComponents, setSelectedComponents] = useState<string[]>([])
+  const [deploymentTasks, setDeploymentTasks] = useState<DeploymentTask[]>([])
+  const [configTasks, setConfigTasks] = useState<ConfigDeploymentTask[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState('hosts')
 
-  const steps = [
-    { id: 0, title: "Environment Setup", description: "Configure basic environment settings" },
-    { id: 1, title: "Database Configuration", description: "Setup VictoriaMetrics configuration" },
-    { id: 2, title: "Monitoring Components", description: "Configure monitoring services" },
-    { id: 3, title: "Alert Configuration", description: "Setup AlertManager and rules" },
-    { id: 4, title: "Deployment", description: "Deploy all components" },
-  ]
+  // 配置表单状态
+  const [configType, setConfigType] = useState('monitoring')
+  const [monitoringConfig, setMonitoringConfig] = useState({
+    nodeExporterTargets: ['localhost:9100'],
+    snmpTargets: ['192.168.1.1'],
+    remoteWriteURL: 'http://victoriametrics:8428/api/v1/write',
+    victoriaMetricsURL: 'http://victoriametrics:8428'
+  })
+  const [alertingConfig, setAlertingConfig] = useState({
+    smtpHost: 'smtp.gmail.com',
+    smtpPort: 587,
+    smtpFrom: 'alerts@company.com',
+    smtpUsername: '',
+    smtpPassword: '',
+    alertEmail: 'admin@company.com',
+    cpuThreshold: 80,
+    memoryThreshold: 85,
+    diskThreshold: 90,
+    interfaceThreshold: 80
+  })
 
-  const components = [
-    { name: "VictoriaMetrics", description: "Time series database", required: true, enabled: true },
-    { name: "Grafana", description: "Visualization and dashboards", required: true, enabled: true },
-    { name: "AlertManager", description: "Alert handling and routing", required: true, enabled: true },
-    { name: "Node Exporter", description: "System metrics collection", required: true, enabled: true },
-    { name: "SNMP Exporter", description: "SNMP metrics collection", required: false, enabled: true },
-    { name: "Categraf", description: "Unified metrics collection", required: false, enabled: true },
-    { name: "Nacos", description: "Service discovery", required: false, enabled: false },
-  ]
+  // 加载数据
+  useEffect(() => {
+    loadHosts()
+    loadComponents()
+  }, [])
 
-  const handleDeploy = () => {
-    setIsDeploying(true)
-    setDeploymentProgress(0)
-
-    // Simulate deployment progress
-    const interval = setInterval(() => {
-      setDeploymentProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setIsDeploying(false)
-          return 100
-        }
-        return prev + 10
-      })
-    }, 500)
+  const loadHosts = async () => {
+    try {
+      const response = await fetch('/api/v1/hosts')
+      if (response.ok) {
+        const data = await response.json()
+        setHosts(data.hosts || [])
+      }
+    } catch (error) {
+      console.error('Failed to load hosts:', error)
+    }
   }
 
-  const StepIndicator = ({ step, isActive, isCompleted }: { step: any; isActive: boolean; isCompleted: boolean }) => (
-    <div
-      className={`flex items-center gap-3 p-3 rounded-lg border ${
-        isActive ? "border-primary bg-primary/5" : isCompleted ? "border-green-500 bg-green-50" : "border-muted"
-      }`}
-    >
-      <div
-        className={`w-8 h-8 rounded-full flex items-center justify-center ${
-          isCompleted ? "bg-green-500 text-white" : isActive ? "bg-primary text-white" : "bg-muted"
-        }`}
-      >
-        {isCompleted ? <CheckCircle className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
-      </div>
-      <div>
-        <h4 className="font-medium">{step.title}</h4>
-        <p className="text-sm text-muted-foreground">{step.description}</p>
-      </div>
-    </div>
-  )
+  const loadComponents = async () => {
+    try {
+      const response = await fetch('/api/v1/deployment/components')
+      if (response.ok) {
+        const data = await response.json()
+        setComponents(data.components || [])
+      }
+    } catch (error) {
+      console.error('Failed to load components:', error)
+    }
+  }
+
+  // 主机选择
+  const toggleHostSelection = (hostId: number) => {
+    setSelectedHosts(prev => 
+      prev.includes(hostId) 
+        ? prev.filter(id => id !== hostId)
+        : [...prev, hostId]
+    )
+  }
+
+  // 组件选择
+  const toggleComponentSelection = (componentName: string) => {
+    setSelectedComponents(prev => 
+      prev.includes(componentName) 
+        ? prev.filter(name => name !== componentName)
+        : [...prev, componentName]
+    )
+  }
+
+  // 批量部署组件
+  const handleBatchDeploy = async () => {
+    if (selectedHosts.length === 0 || selectedComponents.length === 0) {
+      alert('请选择主机和组件')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const componentDeployments = selectedComponents.map(name => {
+        const component = components.find(c => c.name === name)
+        return {
+          name,
+          type: component?.type || 'unknown',
+          version: component?.version || 'latest',
+          port: component?.default_port || 8080,
+          config: {},
+          deploy_method: 'docker'
+        }
+      })
+
+      const response = await fetch('/api/v1/deployment/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          host_ids: selectedHosts,
+          components: componentDeployments
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setDeploymentTasks(prev => [...prev, ...data.tasks])
+        alert('批量部署已启动')
+      } else {
+        const error = await response.json()
+        alert(`部署失败: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Deployment failed:', error)
+      alert('部署失败')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // 部署配置
+  const handleConfigDeploy = async () => {
+    if (selectedHosts.length === 0) {
+      alert('请选择主机')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      let endpoint = ''
+      let configData = {}
+
+      switch (configType) {
+        case 'monitoring':
+          endpoint = '/api/v1/config-deployment/monitoring'
+          configData = {
+            host_ids: selectedHosts,
+            ...monitoringConfig
+          }
+          break
+        case 'alerting':
+          endpoint = '/api/v1/config-deployment/alerting'
+          configData = {
+            host_ids: selectedHosts,
+            ...alertingConfig
+          }
+          break
+        case 'snmp':
+          endpoint = '/api/v1/config-deployment/snmp'
+          configData = {
+            host_ids: selectedHosts
+          }
+          break
+      }
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(configData)
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setConfigTasks(prev => [...prev, data.task])
+        alert('配置部署已启动')
+      } else {
+        const error = await response.json()
+        alert(`配置部署失败: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Config deployment failed:', error)
+      alert('配置部署失败')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // 预览配置
+  const handleConfigPreview = async () => {
+    try {
+      let configData = {}
+      switch (configType) {
+        case 'monitoring':
+          configData = monitoringConfig
+          break
+        case 'alerting':
+          configData = alertingConfig
+          break
+        case 'snmp':
+          configData = {}
+          break
+      }
+
+      const response = await fetch('/api/v1/config-deployment/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          config_type: configType,
+          config_data: configData
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // 显示配置预览
+        const previewWindow = window.open('', '_blank')
+        if (previewWindow) {
+          previewWindow.document.write(`
+            <html>
+              <head><title>配置预览 - ${configType}</title></head>
+              <body>
+                <h1>配置预览 - ${configType}</h1>
+                ${Object.entries(data.configs).map(([filename, content]) => `
+                  <h2>${filename}</h2>
+                  <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px;">${content}</pre>
+                `).join('')}
+              </body>
+            </html>
+          `)
+        }
+      }
+    } catch (error) {
+      console.error('Preview failed:', error)
+      alert('预览失败')
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'online':
+      case 'running':
+      case 'completed':
+      case 'success':
+        return <Badge className="bg-green-100 text-green-800">运行中</Badge>
+      case 'offline':
+      case 'stopped':
+      case 'failed':
+        return <Badge className="bg-red-100 text-red-800">离线</Badge>
+      case 'pending':
+        return <Badge className="bg-yellow-100 text-yellow-800">等待中</Badge>
+      default:
+        return <Badge className="bg-gray-100 text-gray-800">未知</Badge>
+    }
+  }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Deployment Wizard</h1>
-        <p className="text-muted-foreground">Configure and deploy your network monitoring infrastructure</p>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">监控组件部署</h1>
+          <p className="text-muted-foreground">远程部署监控组件和配置文件到目标主机</p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={loadHosts} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            刷新
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-4">
-        {/* Steps Sidebar */}
-        <div className="space-y-2">
-          {steps.map((step) => (
-            <StepIndicator
-              key={step.id}
-              step={step}
-              isActive={currentStep === step.id}
-              isCompleted={currentStep > step.id}
-            />
-          ))}
-        </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="hosts">主机管理</TabsTrigger>
+          <TabsTrigger value="components">组件部署</TabsTrigger>
+          <TabsTrigger value="configs">配置部署</TabsTrigger>
+          <TabsTrigger value="tasks">任务状态</TabsTrigger>
+        </TabsList>
 
-        {/* Main Content */}
-        <div className="lg:col-span-3">
-          {currentStep === 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  Environment Setup
-                </CardTitle>
-                <CardDescription>Configure basic environment settings for your monitoring platform</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
+        <TabsContent value="hosts" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>目标主机</CardTitle>
+              <CardDescription>选择要部署监控组件的主机</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {hosts.map((host) => (
+                  <Card 
+                    key={host.id} 
+                    className={`cursor-pointer transition-colors ${
+                      selectedHosts.includes(host.id) ? 'ring-2 ring-blue-500' : ''
+                    }`}
+                    onClick={() => toggleHostSelection(host.id)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          {selectedHosts.includes(host.id) ? (
+                            <CheckSquare className="h-4 w-4 text-blue-500" />
+                          ) : (
+                            <Square className="h-4 w-4" />
+                          )}
+                          <Server className="h-4 w-4" />
+                          <span className="font-medium">{host.name}</span>
+                        </div>
+                        {getStatusBadge(host.status)}
+                      </div>
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <div>IP: {host.ip}</div>
+                        <div>系统: {host.os} {host.arch}</div>
+                        <div>资源: {host.cpu_cores}核 / {host.memory}MB / {host.disk}GB</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              {hosts.length === 0 && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    暂无可用主机，请先添加主机或进行主机发现
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="components" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>监控组件</CardTitle>
+              <CardDescription>选择要部署的监控组件</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                {components.map((component) => (
+                  <Card 
+                    key={component.name} 
+                    className={`cursor-pointer transition-colors ${
+                      selectedComponents.includes(component.name) ? 'ring-2 ring-blue-500' : ''
+                    }`}
+                    onClick={() => toggleComponentSelection(component.name)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          {selectedComponents.includes(component.name) ? (
+                            <CheckSquare className="h-4 w-4 text-blue-500" />
+                          ) : (
+                            <Square className="h-4 w-4" />
+                          )}
+                          {component.type === 'collector' && <Network className="h-4 w-4" />}
+                          {component.type === 'storage' && <Database className="h-4 w-4" />}
+                          {component.type === 'visualization' && <BarChart3 className="h-4 w-4" />}
+                          {component.type === 'alerting' && <Bell className="h-4 w-4" />}
+                          <span className="font-medium">{component.display_name}</span>
+                        </div>
+                        <Badge variant="outline">{component.version}</Badge>
+                      </div>
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <div>{component.description}</div>
+                        <div>端口: {component.default_port}</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleBatchDeploy} 
+                  disabled={isLoading || selectedHosts.length === 0 || selectedComponents.length === 0}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  批量部署 ({selectedComponents.length} 组件到 {selectedHosts.length} 主机)
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="configs" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>配置部署</CardTitle>
+              <CardDescription>生成并部署监控配置文件到目标主机</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="configType">配置类型</Label>
+                <Select value={configType} onValueChange={setConfigType}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monitoring">监控配置</SelectItem>
+                    <SelectItem value="alerting">告警配置</SelectItem>
+                    <SelectItem value="snmp">SNMP配置</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {configType === 'monitoring' && (
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="deployment-mode">Deployment Mode</Label>
-                    <Select value={deploymentMode} onValueChange={setDeploymentMode}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select deployment mode" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="single">Single Node</SelectItem>
-                        <SelectItem value="cluster">Cluster Mode</SelectItem>
-                        <SelectItem value="docker">Docker Compose</SelectItem>
-                        <SelectItem value="kubernetes">Kubernetes</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div>
+                    <Label htmlFor="nodeTargets">Node Exporter 目标</Label>
+                    <Textarea
+                      id="nodeTargets"
+                      value={monitoringConfig.nodeExporterTargets.join('\n')}
+                      onChange={(e) => setMonitoringConfig(prev => ({
+                        ...prev,
+                        nodeExporterTargets: e.target.value.split('\n').filter(t => t.trim())
+                      }))}
+                      placeholder="localhost:9100&#10;192.168.1.10:9100"
+                    />
                   </div>
+                  <div>
+                    <Label htmlFor="snmpTargets">SNMP 目标</Label>
+                    <Textarea
+                      id="snmpTargets"
+                      value={monitoringConfig.snmpTargets.join('\n')}
+                      onChange={(e) => setMonitoringConfig(prev => ({
+                        ...prev,
+                        snmpTargets: e.target.value.split('\n').filter(t => t.trim())
+                      }))}
+                      placeholder="192.168.1.1&#10;192.168.1.2"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="remoteWriteURL">Remote Write URL</Label>
+                    <Input
+                      id="remoteWriteURL"
+                      value={monitoringConfig.remoteWriteURL}
+                      onChange={(e) => setMonitoringConfig(prev => ({
+                        ...prev,
+                        remoteWriteURL: e.target.value
+                      }))}
+                    />
+                  </div>
+                </div>
+              )}
 
+              {configType === 'alerting' && (
+                <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="admin-user">Admin Username</Label>
-                      <Input id="admin-user" placeholder="admin" />
+                    <div>
+                      <Label htmlFor="smtpHost">SMTP 主机</Label>
+                      <Input
+                        id="smtpHost"
+                        value={alertingConfig.smtpHost}
+                        onChange={(e) => setAlertingConfig(prev => ({
+                          ...prev,
+                          smtpHost: e.target.value
+                        }))}
+                      />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="admin-pass">Admin Password</Label>
-                      <Input id="admin-pass" type="password" placeholder="••••••••" />
+                    <div>
+                      <Label htmlFor="smtpPort">SMTP 端口</Label>
+                      <Input
+                        id="smtpPort"
+                        type="number"
+                        value={alertingConfig.smtpPort}
+                        onChange={(e) => setAlertingConfig(prev => ({
+                          ...prev,
+                          smtpPort: parseInt(e.target.value)
+                        }))}
+                      />
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="domain">Domain/IP</Label>
-                      <Input id="domain" placeholder="monitoring.example.com" />
+                  <div>
+                    <Label htmlFor="alertEmail">告警邮箱</Label>
+                    <Input
+                      id="alertEmail"
+                      type="email"
+                      value={alertingConfig.alertEmail}
+                      onChange={(e) => setAlertingConfig(prev => ({
+                        ...prev,
+                        alertEmail: e.target.value
+                      }))}
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <Label htmlFor="cpuThreshold">CPU 阈值 (%)</Label>
+                      <Input
+                        id="cpuThreshold"
+                        type="number"
+                        value={alertingConfig.cpuThreshold}
+                        onChange={(e) => setAlertingConfig(prev => ({
+                          ...prev,
+                          cpuThreshold: parseFloat(e.target.value)
+                        }))}
+                      />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="timezone">Timezone</Label>
-                      <Select defaultValue="UTC">
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="UTC">UTC</SelectItem>
-                          <SelectItem value="America/New_York">Eastern Time</SelectItem>
-                          <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
-                          <SelectItem value="Europe/London">London</SelectItem>
-                          <SelectItem value="Asia/Shanghai">Shanghai</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div>
+                      <Label htmlFor="memoryThreshold">内存阈值 (%)</Label>
+                      <Input
+                        id="memoryThreshold"
+                        type="number"
+                        value={alertingConfig.memoryThreshold}
+                        onChange={(e) => setAlertingConfig(prev => ({
+                          ...prev,
+                          memoryThreshold: parseFloat(e.target.value)
+                        }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="diskThreshold">磁盘阈值 (%)</Label>
+                      <Input
+                        id="diskThreshold"
+                        type="number"
+                        value={alertingConfig.diskThreshold}
+                        onChange={(e) => setAlertingConfig(prev => ({
+                          ...prev,
+                          diskThreshold: parseFloat(e.target.value)
+                        }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="interfaceThreshold">接口阈值 (%)</Label>
+                      <Input
+                        id="interfaceThreshold"
+                        type="number"
+                        value={alertingConfig.interfaceThreshold}
+                        onChange={(e) => setAlertingConfig(prev => ({
+                          ...prev,
+                          interfaceThreshold: parseFloat(e.target.value)
+                        }))}
+                      />
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              )}
 
-          {currentStep === 1 && (
+              <div className="flex gap-2">
+                <Button onClick={handleConfigPreview} variant="outline">
+                  <Eye className="h-4 w-4 mr-2" />
+                  预览配置
+                </Button>
+                <Button 
+                  onClick={handleConfigDeploy} 
+                  disabled={isLoading || selectedHosts.length === 0}
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  部署配置到 {selectedHosts.length} 主机
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tasks" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Database className="h-5 w-5" />
-                  VictoriaMetrics Configuration
-                </CardTitle>
-                <CardDescription>Configure your time series database settings</CardDescription>
+                <CardTitle>组件部署任务</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent>
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="vm-mode">VictoriaMetrics Mode</Label>
-                    <Select value={vmMode} onValueChange={setVmMode}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select VictoriaMetrics mode" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="single">Single Node</SelectItem>
-                        <SelectItem value="cluster">Cluster Mode</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {vmMode === "cluster" && (
-                    <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
-                      <h4 className="font-medium">Cluster Configuration</h4>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="vmselect-replicas">VMSelect Replicas</Label>
-                          <Input id="vmselect-replicas" type="number" defaultValue="2" />
+                  {deploymentTasks.map((task) => (
+                    <Card key={task.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium">{task.name}</span>
+                          {getStatusBadge(task.status)}
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="vminsert-replicas">VMInsert Replicas</Label>
-                          <Input id="vminsert-replicas" type="number" defaultValue="2" />
+                        <Progress value={task.progress} className="mb-2" />
+                        <div className="text-sm text-muted-foreground">
+                          进度: {task.progress}%
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="vmstorage-replicas">VMStorage Replicas</Label>
-                          <Input id="vmstorage-replicas" type="number" defaultValue="3" />
-                        </div>
-                      </div>
+                        {task.error && (
+                          <Alert className="mt-2">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>{task.error}</AlertDescription>
+                          </Alert>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                  {deploymentTasks.length === 0 && (
+                    <div className="text-center text-muted-foreground py-8">
+                      暂无部署任务
                     </div>
                   )}
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="retention">Data Retention</Label>
-                      <Select defaultValue="30d">
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="7d">7 days</SelectItem>
-                          <SelectItem value="30d">30 days</SelectItem>
-                          <SelectItem value="90d">90 days</SelectItem>
-                          <SelectItem value="1y">1 year</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="storage-size">Storage Size</Label>
-                      <Input id="storage-size" placeholder="100GB" />
-                    </div>
-                  </div>
                 </div>
               </CardContent>
             </Card>
-          )}
 
-          {currentStep === 2 && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Monitoring Components
-                </CardTitle>
-                <CardDescription>Select and configure monitoring components</CardDescription>
+                <CardTitle>配置部署任务</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent>
                 <div className="space-y-4">
-                  {components.map((component, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Checkbox checked={component.enabled} disabled={component.required} />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{component.name}</span>
-                            {component.required && (
-                              <Badge variant="secondary" className="text-xs">
-                                Required
-                              </Badge>
-                            )}
+                  {configTasks.map((task) => (
+                    <Card key={task.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium">{task.name}</span>
+                          {getStatusBadge(task.status)}
+                        </div>
+                        <Progress value={task.progress} className="mb-2" />
+                        <div className="text-sm text-muted-foreground">
+                          配置类型: {task.config_type} | 进度: {task.progress}%
+                        </div>
+                        {task.results && task.results.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {task.results.map((result, index) => (
+                              <div key={index} className="flex items-center gap-2 text-sm">
+                                {result.status === 'success' ? (
+                                  <CheckCircle className="h-3 w-3 text-green-500" />
+                                ) : (
+                                  <AlertCircle className="h-3 w-3 text-red-500" />
+                                )}
+                                <span>{result.host_ip}: {result.message}</span>
+                              </div>
+                            ))}
                           </div>
-                          <p className="text-sm text-muted-foreground">{component.description}</p>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        Configure
-                      </Button>
-                    </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   ))}
+                  {configTasks.length === 0 && (
+                    <div className="text-center text-muted-foreground py-8">
+                      暂无配置部署任务
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
-          )}
-
-          {currentStep === 3 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  Alert Configuration
-                </CardTitle>
-                <CardDescription>Configure AlertManager and default alert rules</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="smtp-server">SMTP Server (Optional)</Label>
-                    <Input id="smtp-server" placeholder="smtp.gmail.com:587" />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="smtp-user">SMTP Username</Label>
-                      <Input id="smtp-user" placeholder="alerts@company.com" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="smtp-pass">SMTP Password</Label>
-                      <Input id="smtp-pass" type="password" placeholder="••••••••" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="alert-emails">Alert Recipients</Label>
-                    <Input id="alert-emails" placeholder="admin@company.com, ops@company.com" />
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-3">
-                    <h4 className="font-medium">Default Alert Rules</h4>
-                    <div className="space-y-2">
-                      {[
-                        "High CPU Usage (>90%)",
-                        "High Memory Usage (>95%)",
-                        "Disk Space Low (<10%)",
-                        "Interface Down",
-                        "Device Unreachable",
-                      ].map((rule, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <Checkbox defaultChecked />
-                          <span className="text-sm">{rule}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {currentStep === 4 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Play className="h-5 w-5" />
-                  Ready to Deploy
-                </CardTitle>
-                <CardDescription>Review your configuration and start the deployment</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {!isDeploying && deploymentProgress === 0 && (
-                  <div className="space-y-4">
-                    <div className="p-4 border rounded-lg bg-muted/50">
-                      <h4 className="font-medium mb-2">Deployment Summary</h4>
-                      <div className="space-y-1 text-sm">
-                        <p>
-                          <strong>Mode:</strong> {deploymentMode || "Not selected"}
-                        </p>
-                        <p>
-                          <strong>VictoriaMetrics:</strong> {vmMode || "Single node"}
-                        </p>
-                        <p>
-                          <strong>Components:</strong> {components.filter((c) => c.enabled).length} enabled
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 p-3 border rounded-lg bg-blue-50">
-                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                      <span className="text-sm">Estimated deployment time: 5-10 minutes</span>
-                    </div>
-                  </div>
-                )}
-
-                {(isDeploying || deploymentProgress > 0) && (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Deployment Progress</span>
-                        <span>{deploymentProgress}%</span>
-                      </div>
-                      <Progress value={deploymentProgress} className="h-2" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <h4 className="font-medium">Deployment Steps</h4>
-                      <div className="space-y-1 text-sm">
-                        <div className={`flex items-center gap-2 ${deploymentProgress >= 20 ? "text-green-600" : ""}`}>
-                          {deploymentProgress >= 20 ? (
-                            <CheckCircle className="h-4 w-4" />
-                          ) : (
-                            <Circle className="h-4 w-4" />
-                          )}
-                          Installing VictoriaMetrics
-                        </div>
-                        <div className={`flex items-center gap-2 ${deploymentProgress >= 40 ? "text-green-600" : ""}`}>
-                          {deploymentProgress >= 40 ? (
-                            <CheckCircle className="h-4 w-4" />
-                          ) : (
-                            <Circle className="h-4 w-4" />
-                          )}
-                          Setting up Grafana
-                        </div>
-                        <div className={`flex items-center gap-2 ${deploymentProgress >= 60 ? "text-green-600" : ""}`}>
-                          {deploymentProgress >= 60 ? (
-                            <CheckCircle className="h-4 w-4" />
-                          ) : (
-                            <Circle className="h-4 w-4" />
-                          )}
-                          Configuring AlertManager
-                        </div>
-                        <div className={`flex items-center gap-2 ${deploymentProgress >= 80 ? "text-green-600" : ""}`}>
-                          {deploymentProgress >= 80 ? (
-                            <CheckCircle className="h-4 w-4" />
-                          ) : (
-                            <Circle className="h-4 w-4" />
-                          )}
-                          Installing exporters
-                        </div>
-                        <div className={`flex items-center gap-2 ${deploymentProgress >= 100 ? "text-green-600" : ""}`}>
-                          {deploymentProgress >= 100 ? (
-                            <CheckCircle className="h-4 w-4" />
-                          ) : (
-                            <Circle className="h-4 w-4" />
-                          )}
-                          Finalizing configuration
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {deploymentProgress === 100 && (
-                  <div className="p-4 border rounded-lg bg-green-50 border-green-200">
-                    <div className="flex items-center gap-2 text-green-800">
-                      <CheckCircle className="h-5 w-5" />
-                      <span className="font-medium">Deployment Completed Successfully!</span>
-                    </div>
-                    <p className="text-sm text-green-700 mt-1">
-                      Your monitoring platform is now ready. You can access the services using the configured domain.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Navigation */}
-          <div className="flex justify-between pt-6">
-            <Button
-              variant="outline"
-              onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
-              disabled={currentStep === 0}
-            >
-              Previous
-            </Button>
-
-            {currentStep < steps.length - 1 ? (
-              <Button onClick={() => setCurrentStep(currentStep + 1)}>Next</Button>
-            ) : (
-              <Button onClick={handleDeploy} disabled={isDeploying || deploymentProgress === 100}>
-                {isDeploying ? "Deploying..." : deploymentProgress === 100 ? "Completed" : "Start Deployment"}
-              </Button>
-            )}
           </div>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
