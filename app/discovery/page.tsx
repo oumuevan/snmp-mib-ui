@@ -1,459 +1,588 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  Search,
-  Play,
-  Pause,
-  RotateCcw,
-  Download,
-  Settings,
-  Network,
-  Server,
-  Router,
-  Shield,
-  Wifi,
+import { 
+  Search, 
+  Plus, 
+  Play, 
+  Pause, 
+  RefreshCw, 
+  Settings, 
+  Monitor, 
+  Server, 
+  Network, 
+  Eye, 
+  Edit, 
+  Trash2,
   CheckCircle,
   XCircle,
   Clock,
-  Eye,
-  Plus,
+  MapPin,
+  Cpu,
+  HardDrive,
+  MemoryStick,
+  Wifi,
+  Key,
+  Shield
 } from "lucide-react"
+import { toast } from "sonner"
 
-interface DiscoveredDevice {
-  id: string
-  ip: string
-  hostname: string
-  mac: string
-  vendor: string
-  deviceType: string
-  status: "discovered" | "identified" | "added" | "failed"
-  services: string[]
-  lastSeen: string
-  responseTime: number
-}
+// 模拟数据
+const mockDiscoveryTasks = [
+  {
+    id: "1",
+    name: "数据中心网段扫描",
+    ipRange: "192.168.1.0/24",
+    ports: "22,80,443,9100",
+    status: "completed",
+    progress: 100,
+    totalHosts: 254,
+    foundHosts: 45,
+    onlineHosts: 38,
+    startedAt: "2024-01-15 10:00:00",
+    completedAt: "2024-01-15 10:15:00"
+  },
+  {
+    id: "2", 
+    name: "办公网络扫描",
+    ipRange: "10.0.0.0/16",
+    ports: "22,3389",
+    status: "running",
+    progress: 65,
+    totalHosts: 65536,
+    foundHosts: 1250,
+    onlineHosts: 980,
+    startedAt: "2024-01-15 14:30:00",
+    completedAt: null
+  }
+]
+
+const mockHosts = [
+  {
+    id: "1",
+    name: "web-server-01",
+    ip: "192.168.1.10",
+    hostname: "web01.company.com",
+    os: "Ubuntu",
+    osVersion: "22.04",
+    arch: "x86_64",
+    status: "online",
+    cpuCores: 8,
+    memory: 16384,
+    disk: 500,
+    lastSeen: "2024-01-15 16:45:00",
+    group: "Web服务器",
+    location: "数据中心A",
+    components: [
+      { name: "node-exporter", status: "running", port: 9100 },
+      { name: "nginx", status: "running", port: 80 }
+    ]
+  },
+  {
+    id: "2",
+    name: "db-server-01", 
+    ip: "192.168.1.20",
+    hostname: "db01.company.com",
+    os: "CentOS",
+    osVersion: "8.5",
+    arch: "x86_64",
+    status: "online",
+    cpuCores: 16,
+    memory: 32768,
+    disk: 2000,
+    lastSeen: "2024-01-15 16:44:00",
+    group: "数据库服务器",
+    location: "数据中心A",
+    components: [
+      { name: "node-exporter", status: "running", port: 9100 },
+      { name: "mysql", status: "running", port: 3306 }
+    ]
+  }
+]
+
+const mockCredentials = [
+  {
+    id: "1",
+    name: "默认SSH凭据",
+    username: "admin",
+    authType: "password",
+    description: "数据中心默认SSH凭据"
+  },
+  {
+    id: "2",
+    name: "生产环境密钥",
+    username: "deploy",
+    authType: "key",
+    description: "生产环境部署密钥"
+  }
+]
 
 export default function DiscoveryPage() {
-  const [isScanning, setIsScanning] = useState(false)
-  const [scanProgress, setScanProgress] = useState(0)
-  const [scanRange, setScanRange] = useState("192.168.1.0/24")
-  const [scanMethod, setScanMethod] = useState("ping")
-  const [selectedDevices, setSelectedDevices] = useState<string[]>([])
+  const [activeTab, setActiveTab] = useState("discovery")
+  const [discoveryTasks, setDiscoveryTasks] = useState(mockDiscoveryTasks)
+  const [hosts, setHosts] = useState(mockHosts)
+  const [credentials, setCredentials] = useState(mockCredentials)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedStatus, setSelectedStatus] = useState("all")
+  const [selectedGroup, setSelectedGroup] = useState("all")
 
-  const discoveredDevices: DiscoveredDevice[] = [
-    {
-      id: "1",
-      ip: "192.168.1.1",
-      hostname: "gateway.local",
-      mac: "00:1A:2B:3C:4D:5E",
-      vendor: "Cisco Systems",
-      deviceType: "Router",
-      status: "identified",
-      services: ["SSH", "HTTP", "SNMP"],
-      lastSeen: "2024-01-27 15:30:00",
-      responseTime: 12,
-    },
-    {
-      id: "2",
-      ip: "192.168.1.10",
-      hostname: "switch-floor1.local",
-      mac: "00:2B:3C:4D:5E:6F",
-      vendor: "HP Enterprise",
-      deviceType: "Switch",
-      status: "discovered",
-      services: ["SNMP", "HTTP"],
-      lastSeen: "2024-01-27 15:29:45",
-      responseTime: 8,
-    },
-    {
-      id: "3",
-      ip: "192.168.1.100",
-      hostname: "server-web01.local",
-      mac: "00:3C:4D:5E:6F:7A",
-      vendor: "Dell Inc.",
-      deviceType: "Server",
-      status: "added",
-      services: ["SSH", "HTTP", "HTTPS", "MySQL"],
-      lastSeen: "2024-01-27 15:30:15",
-      responseTime: 3,
-    },
-    {
-      id: "4",
-      ip: "192.168.1.50",
-      hostname: "firewall.local",
-      mac: "00:4D:5E:6F:7A:8B",
-      vendor: "Fortinet",
-      deviceType: "Firewall",
-      status: "identified",
-      services: ["SSH", "HTTPS", "SNMP"],
-      lastSeen: "2024-01-27 15:28:30",
-      responseTime: 15,
-    },
-    {
-      id: "5",
-      ip: "192.168.1.25",
-      hostname: "ap-lobby.local",
-      mac: "00:5E:6F:7A:8B:9C",
-      vendor: "Ubiquiti Networks",
-      deviceType: "Access Point",
-      status: "discovered",
-      services: ["SSH", "HTTP"],
-      lastSeen: "2024-01-27 15:27:20",
-      responseTime: 25,
-    },
-    {
-      id: "6",
-      ip: "192.168.1.200",
-      hostname: "unknown-device",
-      mac: "00:6F:7A:8B:9C:AD",
-      vendor: "Unknown",
-      deviceType: "Unknown",
-      status: "failed",
-      services: [],
-      lastSeen: "2024-01-27 15:25:10",
-      responseTime: 0,
-    },
-  ]
+  // 新建发现任务对话框状态
+  const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false)
+  const [newTask, setNewTask] = useState({
+    name: "",
+    ipRange: "",
+    ports: "22,80,443,9100",
+    timeout: 5,
+    username: "",
+    authType: "password",
+    password: "",
+    privateKey: ""
+  })
 
-  const scanMethods = [
-    { value: "ping", label: "Ping Sweep", description: "Fast ICMP ping discovery" },
-    { value: "arp", label: "ARP Scan", description: "ARP table discovery" },
-    { value: "snmp", label: "SNMP Discovery", description: "SNMP-based device identification" },
-    { value: "port", label: "Port Scan", description: "TCP port scanning" },
-    { value: "comprehensive", label: "Comprehensive", description: "All methods combined" },
-  ]
+  // 新建凭据对话框状态
+  const [isNewCredentialDialogOpen, setIsNewCredentialDialogOpen] = useState(false)
+  const [newCredential, setNewCredential] = useState({
+    name: "",
+    username: "",
+    authType: "password",
+    password: "",
+    privateKey: "",
+    description: ""
+  })
 
-  const getDeviceIcon = (type: string) => {
-    switch (type.toLowerCase()) {
-      case "router":
-        return Router
-      case "switch":
-        return Network
-      case "firewall":
-        return Shield
-      case "server":
-        return Server
-      case "access point":
-        return Wifi
-      default:
-        return Network
-    }
-  }
+  // 主机详情对话框状态
+  const [selectedHost, setSelectedHost] = useState(null)
+  const [isHostDetailDialogOpen, setIsHostDetailDialogOpen] = useState(false)
 
-  const getStatusBadge = (status: string) => {
+  // 过滤主机
+  const filteredHosts = hosts.filter(host => {
+    const matchesSearch = host.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         host.ip.includes(searchTerm) ||
+                         host.hostname.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = selectedStatus === "all" || host.status === selectedStatus
+    const matchesGroup = selectedGroup === "all" || host.group === selectedGroup
+    return matchesSearch && matchesStatus && matchesGroup
+  })
+
+  // 获取状态颜色
+  const getStatusColor = (status) => {
     switch (status) {
-      case "discovered":
-        return <Badge className="bg-blue-100 text-blue-800">Discovered</Badge>
-      case "identified":
-        return <Badge className="bg-green-100 text-green-800">Identified</Badge>
-      case "added":
-        return <Badge className="bg-purple-100 text-purple-800">Added</Badge>
-      case "failed":
-        return <Badge variant="destructive">Failed</Badge>
-      default:
-        return <Badge variant="outline">Unknown</Badge>
+      case "online": return "text-green-600 bg-green-100"
+      case "offline": return "text-red-600 bg-red-100"
+      case "running": return "text-blue-600 bg-blue-100"
+      case "completed": return "text-green-600 bg-green-100"
+      case "failed": return "text-red-600 bg-red-100"
+      default: return "text-gray-600 bg-gray-100"
     }
   }
 
-  const getStatusIcon = (status: string) => {
+  // 获取状态图标
+  const getStatusIcon = (status) => {
     switch (status) {
-      case "discovered":
-      case "identified":
-        return <CheckCircle className="h-4 w-4 text-green-500" />
-      case "added":
-        return <CheckCircle className="h-4 w-4 text-purple-500" />
+      case "online":
+      case "running":
+      case "completed":
+        return <CheckCircle className="h-4 w-4" />
+      case "offline":
       case "failed":
-        return <XCircle className="h-4 w-4 text-red-500" />
+        return <XCircle className="h-4 w-4" />
       default:
-        return <Clock className="h-4 w-4 text-gray-500" />
+        return <Clock className="h-4 w-4" />
     }
   }
 
-  const handleStartScan = () => {
-    setIsScanning(true)
-    setScanProgress(0)
-
-    // Simulate scanning progress
-    const interval = setInterval(() => {
-      setScanProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setIsScanning(false)
-          return 100
-        }
-        return prev + 10
-      })
-    }, 500)
+  // 创建发现任务
+  const handleCreateTask = () => {
+    const task = {
+      id: Date.now().toString(),
+      ...newTask,
+      status: "pending",
+      progress: 0,
+      totalHosts: 0,
+      foundHosts: 0,
+      onlineHosts: 0,
+      startedAt: null,
+      completedAt: null
+    }
+    
+    setDiscoveryTasks([...discoveryTasks, task])
+    setIsNewTaskDialogOpen(false)
+    setNewTask({
+      name: "",
+      ipRange: "",
+      ports: "22,80,443,9100",
+      timeout: 5,
+      username: "",
+      authType: "password",
+      password: "",
+      privateKey: ""
+    })
+    toast.success("发现任务创建成功")
   }
 
-  const handleStopScan = () => {
-    setIsScanning(false)
-    setScanProgress(0)
+  // 启动发现任务
+  const handleStartTask = (taskId) => {
+    setDiscoveryTasks(tasks => 
+      tasks.map(task => 
+        task.id === taskId 
+          ? { ...task, status: "running", startedAt: new Date().toLocaleString() }
+          : task
+      )
+    )
+    toast.success("发现任务已启动")
   }
 
-  const handleAddDevice = (deviceId: string) => {
-    console.log("Adding device:", deviceId)
+  // 查看主机详情
+  const handleViewHost = (host) => {
+    setSelectedHost(host)
+    setIsHostDetailDialogOpen(true)
   }
 
-  const handleAddSelected = () => {
-    console.log("Adding selected devices:", selectedDevices)
-  }
-
-  const discoveryStats = {
-    totalScanned: 254,
-    devicesFound: discoveredDevices.length,
-    identified: discoveredDevices.filter((d) => d.status === "identified" || d.status === "added").length,
-    failed: discoveredDevices.filter((d) => d.status === "failed").length,
+  // 测试主机连接
+  const handleTestConnection = (hostId) => {
+    toast.success("连接测试成功")
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Search className="h-8 w-8" />
-            Network Discovery
-          </h1>
-          <p className="text-muted-foreground">Automatically discover and identify network devices</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export Results
-          </Button>
-          <Button variant="outline">
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
+    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
+      {/* 页面标题 */}
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-green-500 to-blue-600">
+              <Search className="h-4 w-4 text-white" />
+            </div>
+            <h2 className="text-3xl font-bold tracking-tight">主机发现</h2>
+          </div>
+          <p className="text-muted-foreground">
+            发现网络中的主机并管理监控组件部署
+          </p>
         </div>
       </div>
 
-      {/* Discovery Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">IPs Scanned</CardTitle>
-            <Search className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{discoveryStats.totalScanned}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Devices Found</CardTitle>
-            <Network className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{discoveryStats.devicesFound}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Identified</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{discoveryStats.identified}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Failed</CardTitle>
-            <XCircle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{discoveryStats.failed}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="scan" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="scan">Network Scan</TabsTrigger>
-          <TabsTrigger value="results">Discovery Results</TabsTrigger>
-          <TabsTrigger value="history">Scan History</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="discovery">主机发现</TabsTrigger>
+          <TabsTrigger value="hosts">主机管理</TabsTrigger>
+          <TabsTrigger value="credentials">凭据管理</TabsTrigger>
+          <TabsTrigger value="deployment">组件部署</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="scan" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Network Discovery Configuration</CardTitle>
-              <CardDescription>Configure and start network discovery scan</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="scan-range">IP Range</Label>
-                    <Input
-                      id="scan-range"
-                      value={scanRange}
-                      onChange={(e) => setScanRange(e.target.value)}
-                      placeholder="192.168.1.0/24"
-                    />
+        {/* 主机发现标签页 */}
+        <TabsContent value="discovery" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium">发现任务</h3>
+            <Dialog open={isNewTaskDialogOpen} onOpenChange={setIsNewTaskDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  新建任务
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>创建主机发现任务</DialogTitle>
+                  <DialogDescription>
+                    配置网络扫描参数以发现主机
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="task-name">任务名称</Label>
+                      <Input
+                        id="task-name"
+                        value={newTask.name}
+                        onChange={(e) => setNewTask({...newTask, name: e.target.value})}
+                        placeholder="输入任务名称"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ip-range">IP范围</Label>
+                      <Input
+                        id="ip-range"
+                        value={newTask.ipRange}
+                        onChange={(e) => setNewTask({...newTask, ipRange: e.target.value})}
+                        placeholder="192.168.1.0/24 或 192.168.1.1-192.168.1.100"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="scan-method">Discovery Method</Label>
-                    <Select value={scanMethod} onValueChange={setScanMethod}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {scanMethods.map((method) => (
-                          <SelectItem key={method.value} value={method.value}>
-                            <div>
-                              <div className="font-medium">{method.label}</div>
-                              <div className="text-sm text-muted-foreground">{method.description}</div>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="ports">扫描端口</Label>
+                      <Input
+                        id="ports"
+                        value={newTask.ports}
+                        onChange={(e) => setNewTask({...newTask, ports: e.target.value})}
+                        placeholder="22,80,443,9100"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="timeout">超时时间(秒)</Label>
+                      <Input
+                        id="timeout"
+                        type="number"
+                        value={newTask.timeout}
+                        onChange={(e) => setNewTask({...newTask, timeout: parseInt(e.target.value)})}
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-4">
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-2">Scan Progress</h4>
-                    {isScanning ? (
+                  <Separator />
+                  <div className="space-y-4">
+                    <h4 className="font-medium">SSH认证配置</h4>
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Scanning network...</span>
-                          <span>{scanProgress}%</span>
-                        </div>
-                        <Progress value={scanProgress} className="h-2" />
+                        <Label htmlFor="username">用户名</Label>
+                        <Input
+                          id="username"
+                          value={newTask.username}
+                          onChange={(e) => setNewTask({...newTask, username: e.target.value})}
+                          placeholder="SSH用户名"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="auth-type">认证方式</Label>
+                        <Select value={newTask.authType} onValueChange={(value) => setNewTask({...newTask, authType: value})}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="password">密码</SelectItem>
+                            <SelectItem value="key">私钥</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {newTask.authType === "password" ? (
+                      <div className="space-y-2">
+                        <Label htmlFor="password">密码</Label>
+                        <Input
+                          id="password"
+                          type="password"
+                          value={newTask.password}
+                          onChange={(e) => setNewTask({...newTask, password: e.target.value})}
+                          placeholder="SSH密码"
+                        />
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">Ready to start discovery scan</p>
+                      <div className="space-y-2">
+                        <Label htmlFor="private-key">私钥</Label>
+                        <Textarea
+                          id="private-key"
+                          value={newTask.privateKey}
+                          onChange={(e) => setNewTask({...newTask, privateKey: e.target.value})}
+                          placeholder="粘贴SSH私钥内容"
+                          rows={4}
+                        />
+                      </div>
                     )}
                   </div>
-                  <div className="flex gap-2">
-                    {!isScanning ? (
-                      <Button onClick={handleStartScan} className="flex-1">
-                        <Play className="h-4 w-4 mr-2" />
-                        Start Scan
-                      </Button>
-                    ) : (
-                      <Button onClick={handleStopScan} variant="destructive" className="flex-1">
-                        <Pause className="h-4 w-4 mr-2" />
-                        Stop Scan
-                      </Button>
-                    )}
-                    <Button variant="outline">
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Reset
-                    </Button>
-                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="results" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Discovery Results</CardTitle>
-                  <CardDescription>Devices found during network discovery</CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button onClick={handleAddSelected} disabled={selectedDevices.length === 0} size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Selected ({selectedDevices.length})
+                <div className="flex justify-end space-x-2">
+                  <Button variant="outline" onClick={() => setIsNewTaskDialogOpen(false)}>
+                    取消
+                  </Button>
+                  <Button onClick={handleCreateTask}>
+                    创建任务
                   </Button>
                 </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <div className="grid gap-4">
+            {discoveryTasks.map((task) => (
+              <Card key={task.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <CardTitle className="text-lg">{task.name}</CardTitle>
+                      <CardDescription>
+                        IP范围: {task.ipRange} | 端口: {task.ports}
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge className={getStatusColor(task.status)}>
+                        {getStatusIcon(task.status)}
+                        <span className="ml-1">
+                          {task.status === "running" ? "运行中" : 
+                           task.status === "completed" ? "已完成" : 
+                           task.status === "failed" ? "失败" : "待启动"}
+                        </span>
+                      </Badge>
+                      {task.status === "pending" && (
+                        <Button size="sm" onClick={() => handleStartTask(task.id)}>
+                          <Play className="h-4 w-4 mr-1" />
+                          启动
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {task.status !== "pending" && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>进度</span>
+                          <span>{task.progress}%</span>
+                        </div>
+                        <Progress value={task.progress} className="h-2" />
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div className="space-y-1">
+                        <div className="text-muted-foreground">总主机数</div>
+                        <div className="font-medium">{task.totalHosts}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-muted-foreground">发现主机</div>
+                        <div className="font-medium text-blue-600">{task.foundHosts}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-muted-foreground">在线主机</div>
+                        <div className="font-medium text-green-600">{task.onlineHosts}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-muted-foreground">开始时间</div>
+                        <div className="font-medium">{task.startedAt || "-"}</div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* 主机管理标签页 */}
+        <TabsContent value="hosts" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium">主机列表</h3>
+            <div className="flex items-center space-x-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="搜索主机..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-64"
+                />
               </div>
-            </CardHeader>
-            <CardContent>
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部状态</SelectItem>
+                  <SelectItem value="online">在线</SelectItem>
+                  <SelectItem value="offline">离线</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部分组</SelectItem>
+                  <SelectItem value="Web服务器">Web服务器</SelectItem>
+                  <SelectItem value="数据库服务器">数据库服务器</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Card>
+            <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12">
-                      <input
-                        type="checkbox"
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedDevices(discoveredDevices.map((d) => d.id))
-                          } else {
-                            setSelectedDevices([])
-                          }
-                        }}
-                      />
-                    </TableHead>
-                    <TableHead>Device</TableHead>
-                    <TableHead>IP Address</TableHead>
-                    <TableHead>MAC Address</TableHead>
-                    <TableHead>Vendor</TableHead>
-                    <TableHead>Services</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Response Time</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead>主机信息</TableHead>
+                    <TableHead>系统信息</TableHead>
+                    <TableHead>资源配置</TableHead>
+                    <TableHead>状态</TableHead>
+                    <TableHead>组件</TableHead>
+                    <TableHead>操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {discoveredDevices.map((device) => (
-                    <TableRow key={device.id}>
+                  {filteredHosts.map((host) => (
+                    <TableRow key={host.id}>
                       <TableCell>
-                        <input
-                          type="checkbox"
-                          checked={selectedDevices.includes(device.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedDevices([...selectedDevices, device.id])
-                            } else {
-                              setSelectedDevices(selectedDevices.filter((id) => id !== device.id))
-                            }
-                          }}
-                        />
+                        <div className="space-y-1">
+                          <div className="font-medium">{host.name}</div>
+                          <div className="text-sm text-muted-foreground">{host.ip}</div>
+                          <div className="text-xs text-muted-foreground">{host.hostname}</div>
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(device.status)}
-                          {(() => {
-                            const Icon = getDeviceIcon(device.deviceType)
-                            return <Icon className="h-4 w-4" />
-                          })()}
-                          <div>
-                            <div className="font-medium">{device.hostname}</div>
-                            <div className="text-sm text-muted-foreground">{device.deviceType}</div>
+                        <div className="space-y-1">
+                          <div className="text-sm">{host.os} {host.osVersion}</div>
+                          <div className="text-xs text-muted-foreground">{host.arch}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1 text-sm">
+                          <div className="flex items-center">
+                            <Cpu className="h-3 w-3 mr-1" />
+                            {host.cpuCores} 核
+                          </div>
+                          <div className="flex items-center">
+                            <MemoryStick className="h-3 w-3 mr-1" />
+                            {(host.memory / 1024).toFixed(1)} GB
+                          </div>
+                          <div className="flex items-center">
+                            <HardDrive className="h-3 w-3 mr-1" />
+                            {host.disk} GB
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="font-mono">{device.ip}</TableCell>
-                      <TableCell className="font-mono text-sm">{device.mac}</TableCell>
-                      <TableCell>{device.vendor}</TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {device.services.map((service) => (
-                            <Badge key={service} variant="outline" className="text-xs">
-                              {service}
+                        <div className="space-y-2">
+                          <Badge className={getStatusColor(host.status)}>
+                            {getStatusIcon(host.status)}
+                            <span className="ml-1">
+                              {host.status === "online" ? "在线" : "离线"}
+                            </span>
+                          </Badge>
+                          <div className="text-xs text-muted-foreground">
+                            {host.lastSeen}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {host.components.map((component, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              {component.name}
                             </Badge>
                           ))}
                         </div>
                       </TableCell>
-                      <TableCell>{getStatusBadge(device.status)}</TableCell>
-                      <TableCell>{device.responseTime > 0 ? `${device.responseTime}ms` : "N/A"}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="sm">
+                        <div className="flex items-center space-x-1">
+                          <Button size="sm" variant="ghost" onClick={() => handleViewHost(host)}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {device.status !== "added" && device.status !== "failed" && (
-                            <Button variant="ghost" size="sm" onClick={() => handleAddDevice(device.id)}>
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          )}
+                          <Button size="sm" variant="ghost" onClick={() => handleTestConnection(host.id)}>
+                            <Wifi className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost">
+                            <Edit className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -464,73 +593,275 @@ export default function DiscoveryPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="history" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Scan History</CardTitle>
-              <CardDescription>Previous network discovery scans</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {[
-                  {
-                    id: 1,
-                    timestamp: "2024-01-27 15:30:00",
-                    range: "192.168.1.0/24",
-                    method: "Comprehensive",
-                    devicesFound: 6,
-                    duration: "2m 34s",
-                    status: "completed",
-                  },
-                  {
-                    id: 2,
-                    timestamp: "2024-01-27 10:15:00",
-                    range: "192.168.1.0/24",
-                    method: "Ping Sweep",
-                    devicesFound: 5,
-                    duration: "45s",
-                    status: "completed",
-                  },
-                  {
-                    id: 3,
-                    timestamp: "2024-01-26 16:20:00",
-                    range: "10.0.0.0/16",
-                    method: "SNMP Discovery",
-                    devicesFound: 12,
-                    duration: "5m 12s",
-                    status: "completed",
-                  },
-                ].map((scan) => (
-                  <div key={scan.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <p className="font-medium">{scan.timestamp}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {scan.range} • {scan.method}
-                        </p>
-                      </div>
+        {/* 凭据管理标签页 */}
+        <TabsContent value="credentials" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium">认证凭据</h3>
+            <Dialog open={isNewCredentialDialogOpen} onOpenChange={setIsNewCredentialDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  新建凭据
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>创建认证凭据</DialogTitle>
+                  <DialogDescription>
+                    添加SSH认证凭据用于主机连接
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="cred-name">凭据名称</Label>
+                    <Input
+                      id="cred-name"
+                      value={newCredential.name}
+                      onChange={(e) => setNewCredential({...newCredential, name: e.target.value})}
+                      placeholder="输入凭据名称"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cred-username">用户名</Label>
+                    <Input
+                      id="cred-username"
+                      value={newCredential.username}
+                      onChange={(e) => setNewCredential({...newCredential, username: e.target.value})}
+                      placeholder="SSH用户名"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cred-auth-type">认证方式</Label>
+                    <Select value={newCredential.authType} onValueChange={(value) => setNewCredential({...newCredential, authType: value})}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="password">密码</SelectItem>
+                        <SelectItem value="key">私钥</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {newCredential.authType === "password" ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="cred-password">密码</Label>
+                      <Input
+                        id="cred-password"
+                        type="password"
+                        value={newCredential.password}
+                        onChange={(e) => setNewCredential({...newCredential, password: e.target.value})}
+                        placeholder="SSH密码"
+                      />
                     </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      <div className="text-center">
-                        <p className="font-medium">{scan.devicesFound}</p>
-                        <p className="text-muted-foreground">Devices</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-medium">{scan.duration}</p>
-                        <p className="text-muted-foreground">Duration</p>
-                      </div>
-                      <Badge className="bg-green-100 text-green-800">{scan.status}</Badge>
-                      <Button variant="ghost" size="sm">
-                        <Eye className="h-4 w-4" />
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="cred-private-key">私钥</Label>
+                      <Textarea
+                        id="cred-private-key"
+                        value={newCredential.privateKey}
+                        onChange={(e) => setNewCredential({...newCredential, privateKey: e.target.value})}
+                        placeholder="粘贴SSH私钥内容"
+                        rows={4}
+                      />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="cred-description">描述</Label>
+                    <Textarea
+                      id="cred-description"
+                      value={newCredential.description}
+                      onChange={(e) => setNewCredential({...newCredential, description: e.target.value})}
+                      placeholder="凭据描述"
+                      rows={2}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="outline" onClick={() => setIsNewCredentialDialogOpen(false)}>
+                    取消
+                  </Button>
+                  <Button onClick={() => {
+                    setCredentials([...credentials, {...newCredential, id: Date.now().toString()}])
+                    setIsNewCredentialDialogOpen(false)
+                    setNewCredential({
+                      name: "",
+                      username: "",
+                      authType: "password",
+                      password: "",
+                      privateKey: "",
+                      description: ""
+                    })
+                    toast.success("凭据创建成功")
+                  }}>
+                    创建
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <div className="grid gap-4">
+            {credentials.map((credential) => (
+              <Card key={credential.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <CardTitle className="text-lg flex items-center">
+                        <Key className="h-5 w-5 mr-2" />
+                        {credential.name}
+                      </CardTitle>
+                      <CardDescription>{credential.description}</CardDescription>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="outline">
+                        {credential.authType === "password" ? "密码" : "私钥"}
+                      </Badge>
+                      <Button size="sm" variant="ghost">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost">
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
-                ))}
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">用户名: </span>
+                    <span className="font-medium">{credential.username}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* 组件部署标签页 */}
+        <TabsContent value="deployment" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>组件部署</CardTitle>
+              <CardDescription>
+                选择主机并部署监控组件
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <Monitor className="h-12 w-12 mx-auto mb-4" />
+                <p>组件部署功能正在开发中...</p>
+                <p className="text-sm mt-2">将支持拖拽式组件部署到选定主机</p>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* 主机详情对话框 */}
+      <Dialog open={isHostDetailDialogOpen} onOpenChange={setIsHostDetailDialogOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>主机详情</DialogTitle>
+            <DialogDescription>
+              查看主机的详细信息和组件状态
+            </DialogDescription>
+          </DialogHeader>
+          {selectedHost && (
+            <div className="grid gap-6 py-4">
+              <div className="grid grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">基本信息</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="text-muted-foreground">主机名:</div>
+                      <div className="font-medium">{selectedHost.name}</div>
+                      <div className="text-muted-foreground">IP地址:</div>
+                      <div className="font-medium">{selectedHost.ip}</div>
+                      <div className="text-muted-foreground">域名:</div>
+                      <div className="font-medium">{selectedHost.hostname}</div>
+                      <div className="text-muted-foreground">分组:</div>
+                      <div className="font-medium">{selectedHost.group}</div>
+                      <div className="text-muted-foreground">位置:</div>
+                      <div className="font-medium">{selectedHost.location}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">系统信息</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="text-muted-foreground">操作系统:</div>
+                      <div className="font-medium">{selectedHost.os}</div>
+                      <div className="text-muted-foreground">版本:</div>
+                      <div className="font-medium">{selectedHost.osVersion}</div>
+                      <div className="text-muted-foreground">架构:</div>
+                      <div className="font-medium">{selectedHost.arch}</div>
+                      <div className="text-muted-foreground">最后在线:</div>
+                      <div className="font-medium">{selectedHost.lastSeen}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">资源配置</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-6">
+                    <div className="text-center">
+                      <Cpu className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+                      <div className="text-2xl font-bold">{selectedHost.cpuCores}</div>
+                      <div className="text-sm text-muted-foreground">CPU 核心</div>
+                    </div>
+                    <div className="text-center">
+                      <MemoryStick className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                      <div className="text-2xl font-bold">{(selectedHost.memory / 1024).toFixed(1)}</div>
+                      <div className="text-sm text-muted-foreground">内存 (GB)</div>
+                    </div>
+                    <div className="text-center">
+                      <HardDrive className="h-8 w-8 mx-auto mb-2 text-purple-600" />
+                      <div className="text-2xl font-bold">{selectedHost.disk}</div>
+                      <div className="text-sm text-muted-foreground">磁盘 (GB)</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">已部署组件</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {selectedHost.components.map((component, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <Server className="h-5 w-5 text-blue-600" />
+                          <div>
+                            <div className="font-medium">{component.name}</div>
+                            <div className="text-sm text-muted-foreground">端口: {component.port}</div>
+                          </div>
+                        </div>
+                        <Badge className={getStatusColor(component.status)}>
+                          {getStatusIcon(component.status)}
+                          <span className="ml-1">
+                            {component.status === "running" ? "运行中" : "已停止"}
+                          </span>
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,3 +1,7 @@
+// SNMP MIB Platform - Backend API
+// Author: Evan
+// A modern SNMP MIB management and network monitoring platform
+
 module mib-platform
 
 go 1.23.0
