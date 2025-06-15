@@ -76,6 +76,7 @@ func main() {
 	alertRulesService := services.NewAlertRulesService(db, prometheusService, logger)
 	hostService := services.NewHostService(db, redis)
 	deploymentService := services.NewDeploymentService(db, redis, hostService)
+	configDeploymentService := services.NewConfigDeploymentService(db, redis, hostService)
 
 	// Initialize controllers
 	mibController := controllers.NewMIBController(db, redis)
@@ -84,6 +85,8 @@ func main() {
 	deviceController := controllers.NewDeviceController(db, redis)
 	alertRulesController := controllers.NewAlertRulesController(alertRulesService, deviceService, prometheusService)
 	hostController := controllers.NewHostController(hostService)
+	deploymentController := controllers.NewDeploymentController(deploymentService, hostService)
+	configDeploymentController := controllers.NewConfigDeploymentController(configDeploymentService, hostService)
 
 
 
@@ -178,6 +181,32 @@ func main() {
 		{
 			credentials.GET("", hostController.GetCredentials)
 			credentials.POST("", hostController.CreateCredential)
+		}
+
+		// Deployment routes
+		deployment := api.Group("/deployment")
+		{
+			deployment.GET("/components", deploymentController.GetAvailableComponents)
+			deployment.POST("/tasks", deploymentController.CreateDeploymentTask)
+			deployment.POST("/tasks/:taskId/execute", deploymentController.ExecuteDeployment)
+			deployment.GET("/tasks/:taskId", deploymentController.GetDeploymentTask)
+			deployment.GET("/hosts/:hostId/components", deploymentController.GetHostComponents)
+			deployment.GET("/hosts/:hostId/components/:componentName/status", deploymentController.CheckComponentStatus)
+			deployment.POST("/batch", deploymentController.BatchDeploy)
+			deployment.POST("/config/generate", deploymentController.GenerateDeploymentConfig)
+		}
+
+		// Config deployment routes
+		configDeploy := api.Group("/config-deployment")
+		{
+			configDeploy.GET("/templates", configDeploymentController.GetConfigTemplates)
+			configDeploy.POST("/preview", configDeploymentController.GenerateConfigPreview)
+			configDeploy.POST("/tasks", configDeploymentController.CreateConfigDeploymentTask)
+			configDeploy.POST("/tasks/:taskId/execute", configDeploymentController.ExecuteConfigDeployment)
+			configDeploy.GET("/tasks/:taskId", configDeploymentController.GetConfigDeploymentTask)
+			configDeploy.POST("/monitoring", configDeploymentController.DeployMonitoringConfig)
+			configDeploy.POST("/alerting", configDeploymentController.DeployAlertingConfig)
+			configDeploy.POST("/snmp", configDeploymentController.DeploySNMPConfig)
 		}
 	}
 
