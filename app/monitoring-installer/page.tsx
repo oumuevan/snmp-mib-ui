@@ -22,88 +22,10 @@ import {
   Bell, // Added for VMAlert, Alertmanager (already AlertCircle, Bell is an alternative)
   Network // Added for SNMP Exporter, Categraf (Server is also fine)
 } from 'lucide-react'
+import { COMPONENT_CONFIGS } from './components/ComponentDetails'
 
-// Data from ComponentDetails.tsx (COMPONENT_CONFIGS) - simplified for this update
-// In a real scenario, this would likely be imported or fetched
-const allMonitoringComponentsConfig = {
-  'node-exporter': {
-    id: 'node-exporter',
-    name: 'Node Exporter',
-    description: '系统指标采集器，收集CPU、内存、磁盘等系统指标', // System metrics collector
-    category: 'collector',
-    versions: [{ version: '1.7.0', isLatest: true }],
-  },
-  'categraf': {
-    id: 'categraf',
-    name: 'Categraf',
-    description: '多功能指标采集器，支持多种数据源', // Multi-functional metrics collector
-    category: 'collector',
-    versions: [{ version: '0.3.60', isLatest: true }],
-  },
-  'vmagent': {
-    id: 'vmagent',
-    name: 'VMAgent',
-    description: '轻量级指标代理，负责指标收集和转发', // Lightweight metrics agent
-    category: 'collector',
-    versions: [{ version: '1.96.0', isLatest: true }],
-  },
-  'victoriametrics': {
-    id: 'victoriametrics',
-    name: 'VictoriaMetrics',
-    description: 'VictoriaMetrics单机版，高性能时序数据库', // High-performance time-series database (single-node)
-    category: 'storage',
-    versions: [{ version: '1.96.0', isLatest: true }],
-  },
-  'vmstorage': {
-    id: 'vmstorage',
-    name: 'VMStorage',
-    description: 'VictoriaMetrics集群存储节点', // VictoriaMetrics cluster storage node
-    category: 'storage',
-    versions: [{ version: '1.96.0', isLatest: true }],
-  },
-  'vminsert': {
-    id: 'vminsert',
-    name: 'VMInsert',
-    description: 'VictoriaMetrics集群插入节点', // VictoriaMetrics cluster insert node
-    category: 'storage',
-    versions: [{ version: '1.96.0', isLatest: true }],
-  },
-  'vmselect': {
-    id: 'vmselect',
-    name: 'VMSelect',
-    description: 'VictoriaMetrics集群查询节点', // VictoriaMetrics cluster query node
-    category: 'storage',
-    versions: [{ version: '1.96.0', isLatest: true }],
-  },
-  'vmalert': {
-    id: 'vmalert',
-    name: 'VMAlert',
-    description: 'VictoriaMetrics告警组件', // VictoriaMetrics alerting component
-    category: 'alerting',
-    versions: [{ version: '1.96.0', isLatest: true }],
-  },
-  'grafana': {
-    id: 'grafana',
-    name: 'Grafana',
-    description: '数据可视化和监控面板', // Data visualization and monitoring dashboard
-    category: 'visualization',
-    versions: [{ version: '10.2.3', isLatest: true }],
-  },
-  'snmp-exporter': {
-    id: 'snmp-exporter',
-    name: 'SNMP Exporter',
-    description: 'SNMP设备监控导出器', // SNMP device monitoring exporter
-    category: 'collector',
-    versions: [{ version: '0.24.1', isLatest: true }],
-  },
-  'alertmanager': {
-    id: 'alertmanager',
-    name: 'Alertmanager',
-    description: '告警管理和通知系统', // Alert management and notification system
-    category: 'alerting',
-    versions: [{ version: '0.26.0', isLatest: true }],
-  }
-};
+// Use the actual component configurations from ComponentDetails.tsx
+const allMonitoringComponentsConfig = COMPONENT_CONFIGS
 
 const getIconForCategory = (category: string) => {
   switch (category) {
@@ -129,28 +51,102 @@ export default function MonitoringInstaller() {
     return {
       id: comp.id,
       name: comp.name,
-      description: comp.description, // Assuming description is already in the desired language or a key
+      description: comp.description,
       icon: getIconForCategory(comp.category),
       status: 'available', // Default status
-      version: latestVersion ? latestVersion.version : 'N/A'
+      version: latestVersion ? latestVersion.version : 'N/A',
+      category: comp.category,
+      features: comp.features,
+      requirements: comp.requirements
     };
   });
 
-  const handleInstall = (componentId: string) => {
+  const handleInstall = async (componentId: string) => {
     setIsInstalling(true)
     setInstallProgress(0)
     
-    // 模拟安装过程
-    const interval = setInterval(() => {
-      setInstallProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setIsInstalling(false)
-          return 100
-        }
-        return prev + 10
+    try {
+      // 调用安装API
+      const response = await fetch('/api/monitoring/install', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'install',
+          components: [componentId],
+          configs: {
+            [`docker-compose.${componentId}.yml`]: generateDockerComposeConfig(componentId)
+          }
+        }),
       })
-    }, 500)
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        // 模拟安装进度
+        const interval = setInterval(() => {
+          setInstallProgress(prev => {
+            if (prev >= 100) {
+              clearInterval(interval)
+              setIsInstalling(false)
+              return 100
+            }
+            return prev + 10
+          })
+        }, 500)
+      } else {
+        setIsInstalling(false)
+        console.error('安装失败:', result.errors)
+      }
+    } catch (error) {
+      setIsInstalling(false)
+      console.error('安装请求失败:', error)
+    }
+  }
+
+  // 生成Docker Compose配置
+  const generateDockerComposeConfig = (componentId: string): string => {
+    const component = allMonitoringComponentsConfig[componentId]
+    if (!component) return ''
+    
+    const latestVersion = component.versions.find(v => v.isLatest) || component.versions[0]
+    
+    // 基础配置模板
+    const baseConfig = `version: '3.8'
+services:
+  ${componentId}:
+    image: ${getDockerImage(componentId, latestVersion.version)}
+    container_name: ${componentId}
+    ports:
+      - "${component.defaultPort}:${component.defaultPort}"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+networks:
+  monitoring:
+    external: true
+`
+    return baseConfig
+  }
+
+  // 获取Docker镜像名称
+  const getDockerImage = (componentId: string, version: string): string => {
+    const imageMap: Record<string, string> = {
+      'node-exporter': `prom/node-exporter:v${version}`,
+      'categraf': `flashcatcloud/categraf:v${version}`,
+      'vmagent': `victoriametrics/vmagent:v${version}`,
+      'victoriametrics': `victoriametrics/victoria-metrics:v${version}`,
+      'vmstorage': `victoriametrics/vmstorage:v${version}`,
+      'vminsert': `victoriametrics/vminsert:v${version}`,
+      'vmselect': `victoriametrics/vmselect:v${version}`,
+      'vmalert': `victoriametrics/vmalert:v${version}`,
+      'grafana': `grafana/grafana:${version}`,
+      'snmp-exporter': `prom/snmp-exporter:v${version}`,
+      'alertmanager': `prom/alertmanager:v${version}`
+    }
+    return imageMap[componentId] || `${componentId}:${version}`
   }
 
   return (

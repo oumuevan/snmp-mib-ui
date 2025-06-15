@@ -10,7 +10,16 @@ class ApiClient {
   private baseUrl: string
 
   constructor() {
-    this.baseUrl = "/api"
+    // Use environment variable if available, otherwise fallback to default
+    // In container environment, use backend service name
+    // In development, use localhost
+    if (typeof window === 'undefined') {
+      // Server-side rendering
+      this.baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://mib-backend:8080/api/v1"
+    } else {
+      // Client-side
+      this.baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1"
+    }
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
