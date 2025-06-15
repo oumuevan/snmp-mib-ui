@@ -30,6 +30,10 @@ func Initialize(databaseURL string) (*gorm.DB, error) {
 		&models.ConfigVersion{},
 		&models.SNMPCredential{},
 		&models.Setting{},
+		&models.Host{},
+		&models.HostComponent{},
+		&models.HostDiscoveryTask{},
+		&models.HostCredential{},
 	)
 	if err != nil {
 		return nil, err

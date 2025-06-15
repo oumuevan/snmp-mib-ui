@@ -1,6 +1,23 @@
 {
-  "name": "mibweb-ui",
-  "version": "1.0.0",
+  "name": "snmp-mib-platform",
+  "version": "2.0.0",
+  "description": "A modern SNMP MIB management and network monitoring platform",
+  "author": "Evan <evan@example.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/evan7434/snmp-mib-ui.git"
+  },
+  "keywords": [
+    "snmp",
+    "mib",
+    "network-monitoring",
+    "monitoring",
+    "nextjs",
+    "golang",
+    "victoriametrics",
+    "grafana"
+  ],
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -12,8 +29,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "analyze": "ANALYZE=true next build",
-    "docker:build": "docker build -t mibweb-ui .",
-    "docker:run": "docker run -p 3000:3000 mibweb-ui"
+    "docker:build": "docker build -t snmp-mib-platform .",
+    "docker:run": "docker run -p 3000:3000 snmp-mib-platform"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

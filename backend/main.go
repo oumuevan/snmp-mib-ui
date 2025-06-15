@@ -1,3 +1,7 @@
+// SNMP MIB Platform - Backend API Server
+// Author: Evan
+// A modern SNMP MIB management and network monitoring platform
+
 package main
 
 import (
@@ -70,6 +74,8 @@ func main() {
 	deviceService := services.NewDeviceService(db, redis)
 	prometheusService := services.NewPrometheusService(cfg.PrometheusURL, logger)
 	alertRulesService := services.NewAlertRulesService(db, prometheusService, logger)
+	hostService := services.NewHostService(db, redis)
+	deploymentService := services.NewDeploymentService(db, redis, hostService)
 
 	// Initialize controllers
 	mibController := controllers.NewMIBController(db, redis)
@@ -77,6 +83,7 @@ func main() {
 	configController := controllers.NewConfigController(db, redis)
 	deviceController := controllers.NewDeviceController(db, redis)
 	alertRulesController := controllers.NewAlertRulesController(alertRulesService, deviceService, prometheusService)
+	hostController := controllers.NewHostController(hostService)
 
 
 
@@ -144,6 +151,33 @@ func main() {
 			devices.POST("/:id/test", deviceController.TestDevice)
 			devices.GET("/templates", deviceController.GetDeviceTemplates)
 			devices.POST("/templates", deviceController.CreateDeviceTemplate)
+		}
+
+		// Host discovery and management routes
+		hosts := api.Group("/hosts")
+		{
+			hosts.GET("", hostController.GetHosts)
+			hosts.POST("", hostController.CreateHost)
+			hosts.GET("/:id", hostController.GetHost)
+			hosts.PUT("/:id", hostController.UpdateHost)
+			hosts.DELETE("/:id", hostController.DeleteHost)
+			hosts.POST("/:id/test", hostController.TestHostConnection)
+		}
+
+		// Host discovery tasks routes
+		discovery := api.Group("/discovery")
+		{
+			discovery.GET("/tasks", hostController.GetDiscoveryTasks)
+			discovery.POST("/tasks", hostController.CreateDiscoveryTask)
+			discovery.GET("/tasks/:id", hostController.GetDiscoveryTask)
+			discovery.POST("/tasks/:id/start", hostController.StartDiscovery)
+		}
+
+		// Host credentials routes
+		credentials := api.Group("/credentials")
+		{
+			credentials.GET("", hostController.GetCredentials)
+			credentials.POST("", hostController.CreateCredential)
 		}
 	}
 

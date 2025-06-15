@@ -6,7 +6,7 @@
 [![Go Version](https://img.shields.io/badge/Go-1.23+-blue.svg)](https://golang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-14+-black.svg)](https://nextjs.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
-[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](https://github.com/Oumu33/snmp-mib-ui)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](https://github.com/evan7434/snmp-mib-ui)
 
 **现代化的 SNMP MIB 管理和网络监控平台**
 
@@ -61,11 +61,30 @@ SNMP MIB Web Platform 是一个现代化的网络设备管理和监控平台，�
 
 ## 🚀 快速开始
 
-### 📦 一键部署
+### 🇨🇳 中国大陆一键部署（推荐）
+
+> **针对国内网络环境优化，使用国内镜像源，部署速度更快**
 
 ```bash
 # 克隆项目
-git clone https://github.com/Oumu33/snmp-mib-ui.git
+git clone https://github.com/evan7434/snmp-mib-ui.git
+cd snmp-mib-ui
+
+# 一键部署（国内优化版）
+./deploy-china.sh
+```
+
+**国内部署优势：**
+- ✅ 使用阿里云镜像源，下载速度快
+- ✅ 自动配置 npm/Go 国内代理
+- ✅ 优化网络连接和超时设置
+- ✅ 包含完整的健康检查和错误处理
+
+### 🌍 国际标准部署
+
+```bash
+# 克隆项目
+git clone https://github.com/evan7434/snmp-mib-ui.git
 cd snmp-mib-ui
 
 # 启动服务
@@ -80,6 +99,9 @@ docker-compose up -d
 |------|------|------|
 | 🌐 **Web 界面** | http://localhost:3000 | 主要管理界面 |
 | 🔧 **后端 API** | http://localhost:8080 | RESTful API |
+| 📊 **Grafana** | http://localhost:3001 | 监控面板 (admin/admin) |
+| 📈 **VictoriaMetrics** | http://localhost:8428 | 时序数据库 |
+| 🚨 **Alertmanager** | http://localhost:9093 | 告警管理 |
 | 📊 **健康检查** | http://localhost:8080/health | 服务状态检查 |
 
 ---
@@ -96,11 +118,37 @@ docker-compose up -d
 | **系统** | Ubuntu 22.04+ | Ubuntu 24.04 LTS |
 | **架构** | AMD64/ARM64 | AMD64 |
 
-### 🐳 Docker 部署（推荐）
+### 🐳 Docker 部署方案
+
+#### 🇨🇳 中国大陆优化部署（推荐）
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/Oumu33/snmp-mib-ui.git
+git clone https://github.com/evan7434/snmp-mib-ui.git
+cd snmp-mib-ui
+
+# 2. 一键部署（包含环境检查和配置）
+./deploy-china.sh
+
+# 3. 查看服务状态
+docker-compose -f docker-compose.china.yml ps
+
+# 4. 查看日志
+docker-compose -f docker-compose.china.yml logs -f
+```
+
+**中国大陆部署特性：**
+- 🚀 **自动环境检查** - 检查 Docker、内存、磁盘空间
+- 🌐 **国内镜像源** - 阿里云镜像，下载速度快
+- 🔧 **自动配置** - 自动生成安全的环境配置
+- 📊 **健康检查** - 等待所有服务就绪后显示访问信息
+- 🛠️ **故障处理** - 自动清理失败的部署
+
+#### 🌍 标准 Docker 部署
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/evan7434/snmp-mib-ui.git
 cd snmp-mib-ui
 
 # 2. 配置环境变量（可选）
@@ -175,7 +223,8 @@ docker-compose -f docker-compose.monitoring.yml up -d
 
 ### 📚 用户文档
 - [📖 **完整部署指南**](DEPLOYMENT_GUIDE.md) - 详细的部署和配置说明
-- [🚀 **快速开始指南**](docs/quick-start.md) - 5分钟快速上手
+- [☸️ **Kubernetes 部署**](k8s/README.md) - 企业级 K8s 部署方案
+- [🇨🇳 **中国大陆部署**](#-中国大陆一键部署推荐) - 国内网络优化部署
 - [🔧 **配置说明**](docs/configuration.md) - 详细配置参数说明
 - [🛠️ **故障排除**](docs/troubleshooting.md) - 常见问题解决方案
 
@@ -186,6 +235,7 @@ docker-compose -f docker-compose.monitoring.yml up -d
 - [📊 **性能基准**](docs/performance-benchmarks.md) - 性能测试和优化
 
 ### 📋 项目文档
+- [📊 **完成报告**](COMPLETION_REPORT.md) - 功能完成度和技术细节
 - [📝 **项目总结**](PROJECT_SUMMARY.md) - 项目功能和技术栈总览
 - [📅 **更新日志**](CHANGELOG.md) - 版本历史和更新内容
 - [🤝 **贡献指南**](CONTRIBUTING.md) - 如何参与项目贡献
@@ -259,7 +309,7 @@ docker-compose -f docker-compose.monitoring.yml up -d
 
 ```bash
 # 1. Fork 项目
-git clone https://github.com/your-username/snmp-mib-ui.git
+git clone https://github.com/evan7434/snmp-mib-ui.git
 
 # 2. 创建功能分支
 git checkout -b feature/your-feature-name
@@ -296,9 +346,9 @@ git push origin feature/your-feature-name
 ### 🆘 获取帮助
 
 - 📖 **文档** - 查看 [完整文档](docs/)
-- 🐛 **问题报告** - 创建 [GitHub Issue](https://github.com/Oumu33/snmp-mib-ui/issues)
-- 💬 **讨论** - 参与 [GitHub Discussions](https://github.com/Oumu33/snmp-mib-ui/discussions)
-- 📧 **联系** - 发送邮件至项目维护者
+- 🐛 **问题报告** - 创建 [GitHub Issue](https://github.com/evan7434/snmp-mib-ui/issues)
+- 💬 **讨论** - 参与 [GitHub Discussions](https://github.com/evan7434/snmp-mib-ui/discussions)
+- 📧 **联系** - 发送邮件至 Evan (evan@example.com)
 
 ### 🌟 项目状态
 
